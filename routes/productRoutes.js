@@ -11,9 +11,7 @@ import { verifyJWT, verifyRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// POST /products – seller creates product (agentVerified required)
-router.post("/", verifyJWT, verifyRole(["seller"]), createProduct);
-
+// Public routes
 // GET /products – get all approved listings
 router.get("/", getAllProducts);
 
@@ -23,15 +21,14 @@ router.get("/search", searchProducts);
 // GET /products/:id – product details
 router.get("/:id", getProductById);
 
+// Protected routes
+// POST /products – seller creates product (agentVerified required)
+router.post("/", verifyJWT, verifyRole(["seller"]), createProduct);
+
 // PATCH /products/approve/:id – agent approves product
 router.patch("/approve/:id", verifyJWT, verifyRole(["agent"]), approveProduct);
 
 // DELETE /products/:id – seller deletes their product
-router.delete(
-	"/:id",
-	verifyJWT,
-	verifyRole(["seller", "admin"]),
-	deleteProduct
-);
+router.delete("/:id", verifyJWT, deleteProduct);
 
 export default router;

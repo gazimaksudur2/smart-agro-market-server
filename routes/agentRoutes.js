@@ -9,6 +9,7 @@ import { verifyJWT, verifyRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// All agent routes are protected
 // POST /agents/apply – apply to become agent
 router.post("/apply", verifyJWT, applyForAgent);
 

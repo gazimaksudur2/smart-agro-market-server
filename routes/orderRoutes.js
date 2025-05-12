@@ -11,6 +11,7 @@ import { verifyJWT, verifyRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// All order routes are protected
 // POST /orders – place order (consumer)
 router.post("/", verifyJWT, verifyRole(["consumer"]), createOrder);
 
@@ -21,7 +22,12 @@ router.get("/my-orders", verifyJWT, getMyOrders);
 router.patch("/status/:id", verifyJWT, updateOrderStatus);
 
 // PATCH /orders/return/:id – auto/manual return logic
-router.patch("/return/:id", verifyJWT, returnOrder);
+router.patch(
+	"/return/:id",
+	verifyJWT,
+	verifyRole(["agent", "admin"]),
+	returnOrder
+);
 
 // PATCH /orders/complete/:id – mark as delivered
 router.patch(

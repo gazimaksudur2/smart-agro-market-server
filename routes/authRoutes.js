@@ -11,12 +11,14 @@ import { verifyJWT, verifyRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// Public routes
 // POST /users/register – register user
 router.post("/register", register);
 
 // POST /users/login – login via Firebase JWT
 router.post("/login", login);
 
+// Protected routes
 // GET /users/profile – get profile (protected)
 router.get("/profile", verifyJWT, getProfile);
 
