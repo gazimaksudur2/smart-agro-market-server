@@ -2,6 +2,7 @@ import express from "express";
 import {
 	register,
 	login,
+	logout,
 	getProfile,
 	updateRole,
 	getAllAgents,
@@ -17,6 +18,9 @@ router.post("/register", register);
 
 // POST /users/login – login via Firebase JWT
 router.post("/login", login);
+
+// GET /users/logout - logout user
+router.get("/logout", logout);
 
 // Protected routes
 // GET /users/profile – get profile (protected)

@@ -8,7 +8,16 @@ const admin = initializeFirebaseAdmin();
 // Register a new user
 export const register = async (req, res) => {
 	try {
-		const { name, email, password, role, phoneNumber, address } = req.body;
+		const {
+			name,
+			email,
+			password,
+			role,
+			phoneNumber,
+			address,
+			firebaseUID,
+			profilePicture,
+		} = req.body;
 
 		// Check if user already exists
 		const existingUser = await User.findOne({ email });
@@ -31,6 +40,8 @@ export const register = async (req, res) => {
 			role: role || "consumer",
 			phoneNumber,
 			address,
+			firebaseUID,
+			profilePicture,
 		});
 
 		await newUser.save();
@@ -41,6 +52,18 @@ export const register = async (req, res) => {
 			process.env.JWT_SECRET || "smart_agro_connect_jwt_super_secret_key",
 			{ expiresIn: "1d" }
 		);
+
+		// Set cookie options
+		const cookieOptions = {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			maxAge: 24 * 60 * 60 * 1000, // 1 day
+			sameSite: "strict",
+			path: "/",
+		};
+
+		// Set JWT as a cookie
+		res.cookie("jwt", token, cookieOptions);
 
 		res.status(201).json({
 			success: true,
@@ -91,6 +114,18 @@ export const login = async (req, res) => {
 					process.env.JWT_SECRET || "smart_agro_connect_jwt_super_secret_key",
 					{ expiresIn: "1d" }
 				);
+
+				// Set cookie options
+				const cookieOptions = {
+					httpOnly: true,
+					secure: process.env.NODE_ENV === "production",
+					maxAge: 24 * 60 * 60 * 1000, // 1 day
+					sameSite: "strict",
+					path: "/",
+				};
+
+				// Set JWT as a cookie
+				res.cookie("jwt", token, cookieOptions);
 
 				return res.status(200).json({
 					success: true,
@@ -145,6 +180,18 @@ export const login = async (req, res) => {
 			{ expiresIn: "1d" }
 		);
 
+		// Set cookie options
+		const cookieOptions = {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			maxAge: 24 * 60 * 60 * 1000, // 1 day
+			sameSite: "strict",
+			path: "/",
+		};
+
+		// Set JWT as a cookie
+		res.cookie("jwt", token, cookieOptions);
+
 		res.status(200).json({
 			success: true,
 			token,
@@ -161,6 +208,20 @@ export const login = async (req, res) => {
 			message: error.message,
 		});
 	}
+};
+
+// Logout user
+export const logout = (req, res) => {
+	res.clearCookie("jwt", {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === "production",
+		path: "/",
+	});
+
+	res.status(200).json({
+		success: true,
+		message: "Logged out successfully",
+	});
 };
 
 // Get user profile

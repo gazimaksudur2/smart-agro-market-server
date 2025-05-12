@@ -5,7 +5,9 @@ const connectDB = async () => {
 	try {
 		const conn = await mongoose.connect(
 			process.env.DB_URI ||
-				`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.mongodb.net`,
+				`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${
+					process.env.DB_CLUSTER || "cluster0.mongodb.net"
+				}/smart_agro_connect`,
 			{
 				useNewUrlParser: true,
 				useUnifiedTopology: true,

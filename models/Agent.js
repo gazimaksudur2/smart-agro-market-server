@@ -133,4 +133,4 @@ agentSchema.index({ "warehouseAddress.district": 1 });
 agentSchema.index({ email: 1 });
 agentSchema.index({ userId: 1 });
 
-export default mongoose.model("Agent", agentSchema);
+export default mongoose.model("Agent-detail", agentSchema);
