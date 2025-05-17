@@ -2,11 +2,12 @@ import express from "express";
 import {
 	register,
 	login,
-	logout,
+	// logout,
 	getProfile,
 	updateRole,
 	getAllAgents,
 	getAgentByRegion,
+	getUserWithEmail
 } from "../controllers/authController.js";
 import { verifyJWT, verifyRole } from "../middleware/auth.js";
 
@@ -20,7 +21,7 @@ router.post("/register", register);
 router.post("/login", login);
 
 // GET /users/logout - logout user
-router.get("/logout", logout);
+// router.get("/logout", logout);
 
 // Protected routes
 // GET /users/profile – get profile (protected)
@@ -34,5 +35,7 @@ router.get("/agents", getAllAgents);
 
 // GET /users/agents/:region – get agent by region
 router.get("/agents/:region", getAgentByRegion);
+
+router.get("/:email", verifyJWT, getUserWithEmail)
 
 export default router;

@@ -3,9 +3,9 @@ import jwt from "jsonwebtoken";
 // Generate a JWT and save it in a cookie
 export const generateToken = async (req, res) => {
 	try {
-		const { userId, email, role } = req.body;
+		const { uid, email, role } = req.body;
 
-		if (!userId || !email) {
+		if (!uid || !email) {
 			return res.status(400).json({
 				success: false,
 				message: "User ID and email are required",
@@ -14,7 +14,7 @@ export const generateToken = async (req, res) => {
 
 		// Generate JWT
 		const token = jwt.sign(
-			{ id: userId, email, role: role || "consumer" },
+			{ id: uid, email, role: role || "consumer" },
 			process.env.JWT_SECRET || "smart_agro_connect_jwt_super_secret_key",
 			{ expiresIn: "1d" }
 		);
@@ -34,7 +34,7 @@ export const generateToken = async (req, res) => {
 		res.status(200).json({
 			success: true,
 			message: "Token generated and stored in cookie",
-			user: { id: userId, email, role: role || "consumer" },
+			user: { id: uid, email, role: role || "consumer" },
 		});
 	} catch (error) {
 		res.status(500).json({

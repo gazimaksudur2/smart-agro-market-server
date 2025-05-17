@@ -4,7 +4,6 @@ import {
 	verifyToken,
 	clearToken,
 } from "../controllers/jwtController.js";
-import { verifyJWT } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -15,6 +14,6 @@ router.post("/token", generateToken);
 router.get("/verify", verifyToken);
 
 // GET /jwt/clear - Clear the JWT cookie (logout)
-router.get("/clear", clearToken);
+router.post("/clear", clearToken);
 
 export default router;

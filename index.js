@@ -30,12 +30,12 @@ connectDB();
 
 // Middleware
 app.use(
-	cors({
-		origin: "*", // Allow all origins
-		methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-		allowedHeaders: ["Content-Type", "Authorization"],
-		credentials: true, // Allow cookies to be sent with requests
-	})
+  cors({
+    origin: ["*", "http://localhost:5173", "http://localhost:5000"], // Allow all origins
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true, // Allow cookies to be sent with requests
+  })
 );
 app.use(express.json());
 app.use(cookieParser());
