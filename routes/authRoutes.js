@@ -7,7 +7,8 @@ import {
 	updateRole,
 	getAllAgents,
 	getAgentByRegion,
-	getUserWithEmail
+	getUserWithEmail,
+	verifyUser
 } from "../controllers/authController.js";
 import { verifyJWT, verifyRole } from "../middleware/auth.js";
 
@@ -23,6 +24,14 @@ router.post("/login", login);
 // GET /users/logout - logout user
 // router.get("/logout", logout);
 
+// GET /users/agents – list all approved agents
+router.get("/agents", getAllAgents);
+
+router.get("/verifyUser", verifyUser);
+
+// GET /users/agents/:region – get agent by region
+router.get("/agents/:region", getAgentByRegion);
+
 // Protected routes
 // GET /users/profile – get profile (protected)
 router.get("/profile", verifyJWT, getProfile);
@@ -30,12 +39,6 @@ router.get("/profile", verifyJWT, getProfile);
 // PATCH /users/role – admin assigns/updates role
 router.patch("/role", verifyJWT, verifyRole(["admin"]), updateRole);
 
-// GET /users/agents – list all approved agents
-router.get("/agents", getAllAgents);
-
-// GET /users/agents/:region – get agent by region
-router.get("/agents/:region", getAgentByRegion);
-
-router.get("/:email", verifyJWT, getUserWithEmail)
+router.get("/:email", verifyJWT, getUserWithEmail);
 
 export default router;

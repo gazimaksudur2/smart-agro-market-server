@@ -30,7 +30,7 @@ export const register = async (req, res) => {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
     // Create new user
     const newUser = new User({
@@ -236,6 +236,24 @@ export const getUserWithEmail = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
     return res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Verify an user
+export const verifyUser = async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.query.email });
+    if (!user) {
+      return res
+        .status(200)
+        .json({ success: false, message: "User not found" });
+    }
+	res.status(200).json({success: true, message: "User verified successfully" });
   } catch (error) {
     res.status(500).json({
       success: false,
