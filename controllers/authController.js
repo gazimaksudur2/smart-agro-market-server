@@ -1,9 +1,6 @@
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import initializeFirebaseAdmin from "../config/firebaseAdmin.js";
-
-const admin = initializeFirebaseAdmin();
 
 // Register a new user
 export const register = async (req, res) => {
@@ -58,7 +55,8 @@ export const register = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 24 * 60 * 60 * 1000, // 1 day
-      sameSite: "strict",
+      sameSite: "none",
+      partitioned: true, // Not yet supported in Express as of May 2025
       path: "/",
     };
 
@@ -86,66 +84,9 @@ export const register = async (req, res) => {
 // Login user
 export const login = async (req, res) => {
   try {
-    const { email, password, firebaseToken } = req.body;
-
-    // If using Firebase token
-    if (firebaseToken) {
-      try {
-        const decodedToken = await admin.auth().verifyIdToken(firebaseToken);
-        const { email, uid } = decodedToken;
-
-        // Find or create user
-        let user = await User.findOne({ email });
-
-        if (!user) {
-          // Create new user from Firebase
-          user = new User({
-            email,
-            name: decodedToken.name || email.split("@")[0],
-            firebaseUID: uid,
-            role: "consumer",
-          });
-          await user.save();
-        }
-
-        // Generate JWT
-        const token = jwt.sign(
-          { id: user._id, email: user.email, role: user.role },
-          process.env.JWT_SECRET || "smart_agro_connect_jwt_super_secret_key",
-          { expiresIn: "1d" }
-        );
-
-        // Set cookie options
-        const cookieOptions = {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          maxAge: 24 * 60 * 60 * 1000, // 1 day
-          sameSite: "strict",
-          path: "/",
-        };
-
-        // Set JWT as a cookie
-        res.cookie("jwt", token, cookieOptions);
-
-        return res.status(200).json({
-          success: true,
-          token,
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          },
-        });
-      } catch (error) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid Firebase token",
-        });
-      }
-    }
-
     // Regular email/password login
+    // console.log(email);
+    const { email, password } = req.body;
     const user = await User.findOne({ email });
 
     if (!user) {
@@ -159,7 +100,7 @@ export const login = async (req, res) => {
     if (!user.password) {
       return res.status(400).json({
         success: false,
-        message: "Please login with Google",
+        message: "Please login with Google or Facebook",
       });
     }
 
@@ -185,7 +126,8 @@ export const login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 24 * 60 * 60 * 1000, // 1 day
-      sameSite: "strict",
+      sameSite: "none",
+      partitioned: true, // Not yet supported in Express as of May 2025
       path: "/",
     };
 
