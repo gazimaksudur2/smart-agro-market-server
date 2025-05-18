@@ -1,4 +1,4 @@
-export const regions = [
+const regions = [
 	{
 		id: 1,
 		name: "Dhaka",
@@ -120,3 +120,5 @@ export const regions = [
 		],
 	},
 ];
+
+export default regions;

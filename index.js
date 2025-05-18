@@ -11,6 +11,7 @@ import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import jwtRoutes from "./routes/jwtRoutes.js";
+import regionRoutes from "./routes/regionRoutes.js";
 
 // Import middleware
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -53,6 +54,7 @@ app.use("/products", productRoutes);
 app.use("/orders", orderRoutes);
 app.use("/reviews", reviewRoutes);
 app.use("/jwt", jwtRoutes);
+app.use("/regions", regionRoutes);
 
 // Base route
 app.get("/", (req, res) => {
@@ -83,7 +85,7 @@ app.post("/", async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 24 * 60 * 60 * 1000, // 1 day
-      sameSite: "none",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
       partitioned: true, // Not yet supported in Express as of May 2025
       path: "/",
     };

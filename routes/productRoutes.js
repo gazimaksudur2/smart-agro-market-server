@@ -4,6 +4,7 @@ import {
 	getAllProducts,
 	searchProducts,
 	getProductById,
+	getCropTypes,
 	approveProduct,
 	deleteProduct,
 } from "../controllers/productController.js";
@@ -18,12 +19,15 @@ router.get("/", getAllProducts);
 // GET /products/search – filtered search (by region/type/price)
 router.get("/search", searchProducts);
 
+router.get("/crop-types", getCropTypes);
+
 // GET /products/:id – product details
 router.get("/:id", getProductById);
 
+
 // Protected routes
 // POST /products – seller creates product (agentVerified required)
-router.post("/", verifyJWT, verifyRole(["seller"]), createProduct);
+router.post("/create-product", verifyJWT, verifyRole(["seller"]), createProduct);
 
 // PATCH /products/approve/:id – agent approves product
 router.patch("/approve/:id", verifyJWT, verifyRole(["agent"]), approveProduct);

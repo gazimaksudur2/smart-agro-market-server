@@ -18,6 +18,11 @@ const userSchema = new mongoose.Schema(
 			type: String,
 			required: false, // Not required for OAuth users
 		},
+		provider: {
+			type: String,
+			enum: ["email-pass", "google", "facebook", "github", "twitter"],
+			default: "email-pass",
+		},
 		role: {
 			type: String,
 			enum: ["admin", "agent", "seller", "consumer"],
@@ -56,10 +61,6 @@ const userSchema = new mongoose.Schema(
 			required: function () {
 				return this.role === "agent";
 			},
-		},
-		createdAt: {
-			type: Date,
-			default: Date.now,
 		},
 		isActive: {
 			type: Boolean,
