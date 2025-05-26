@@ -1,11 +1,9 @@
-import express from 'express';
-import regions from '../data/regions.js';
+import express from "express";
+import { getRegions } from "../controllers/regionController.js";
 
 const router = express.Router();
 
-router.get('', async(req, res)=>{
-    res.status(200).json({success: true, data: regions});
-});
-
+// GET /regions - Get all regions with districts
+router.get("/", getRegions);
 
 export default router;

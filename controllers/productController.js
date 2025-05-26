@@ -80,6 +80,12 @@ export const getAllProducts = async (req, res) => {
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
     }
 
+    const maxPriceResult = await Product.aggregate([
+      { $match: { status: "approved" } }, // Optional: filter by approved products
+      { $group: { _id: null, maxPrice: { $max: "$price" } } },
+    ]);
+    const existingMaxPrice = maxPriceResult.length > 0 ? maxPriceResult[0].maxPrice : 0;
+
     // Pagination
     const options = {
       page: parseInt(page, 10),
@@ -100,6 +106,7 @@ export const getAllProducts = async (req, res) => {
       totalPages: Math.ceil(total / options.limit),
       currentPage: options.page,
       totalProducts: total,
+      maxPrice: existingMaxPrice
     });
   } catch (error) {
     res.status(500).json({
@@ -191,7 +198,9 @@ export const getProductById = async (req, res) => {
 export const getCropTypes = async (req, res) => {
   try {
     // Get unique crop types from all products
-    const cropTypes = await Product.distinct("cropType", { cropType: { $ne: null } });
+    const cropTypes = await Product.distinct("cropType", {
+      cropType: { $ne: null },
+    });
     cropTypes.sort(); // Optional: sort alphabetically
 
     res.status(200).json({

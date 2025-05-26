@@ -40,6 +40,7 @@ export const generateToken = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
+      data: token,
       message: error.message,
     });
   }

@@ -3,94 +3,62 @@ import Product from "../models/Product.js";
 import User from "../models/User.js";
 import mongoose from "mongoose";
 
-// Place a new order
+// Create order according to documentation
 export const createOrder = async (req, res) => {
 	try {
 		const {
-			consumerId,
-			products,
-			shippingAddress,
-			paymentMethod,
-			contactNumber,
+			userId,
+			items,
+			deliveryDetails,
+			totalAmount,
+			advancePaymentAmount,
+			paymentIntentId,
+			status = "pending",
 		} = req.body;
 
-		// Validate products array
-		if (!products || products.length === 0) {
+		// Validate required fields
+		if (!userId || !items || !deliveryDetails || !totalAmount) {
 			return res.status(400).json({
 				success: false,
-				message: "No products in order",
+				message: "Missing required fields",
 			});
 		}
 
-		let totalAmount = 0;
-		let deliveryFee = 0;
-		let platformFee = 0;
-		let agentCommission = 0;
-
-		// Calculate order totals and check product availability
-		for (const item of products) {
-			const product = await Product.findById(item.productId);
-
-			if (!product) {
-				return res.status(404).json({
-					success: false,
-					message: `Product ${item.productId} not found`,
-				});
-			}
-
-			if (product.status !== "approved") {
-				return res.status(400).json({
-					success: false,
-					message: `Product ${product.name} is not approved for sale`,
-				});
-			}
-
-			if (product.quantity < item.quantity) {
-				return res.status(400).json({
-					success: false,
-					message: `Insufficient quantity for ${product.name}`,
-				});
-			}
-
-			// Calculate item total
-			const itemTotal = product.price * item.quantity;
-			totalAmount += itemTotal;
-
-			// Update product quantity
-			product.quantity -= item.quantity;
-			await product.save();
+		if (!items || items.length === 0) {
+			return res.status(400).json({
+				success: false,
+				message: "No items in order",
+			});
 		}
 
-		// Calculate fees
-		const baseFee = 50; // Base delivery fee
-		deliveryFee = baseFee;
-		platformFee = totalAmount * 0.05; // 5% platform fee
-		agentCommission = totalAmount * 0.03; // 3% agent commission
+		// Generate order number
+		const orderCount = await Order.countDocuments();
+		const orderNumber = `ORD-${new Date().getFullYear()}-${String(
+			orderCount + 1
+		).padStart(3, "0")}`;
 
 		// Create new order
 		const newOrder = new Order({
-			consumerId,
-			products: products.map((item) => ({
-				productId: item.productId,
-				quantity: item.quantity,
-				price: item.price,
-			})),
-			shippingAddress,
-			contactNumber,
-			paymentMethod,
+			orderNumber,
+			userId,
+			items,
+			deliveryDetails,
 			totalAmount,
-			deliveryFee,
-			platformFee,
-			agentCommission,
-			status: "pending",
-			deliveryStatus: "packaging",
+			advancePaymentAmount: advancePaymentAmount || totalAmount,
+			paymentIntentId,
+			status,
 		});
 
 		await newOrder.save();
 
 		res.status(201).json({
 			success: true,
-			order: newOrder,
+			message: "Order created successfully",
+			order: {
+				_id: newOrder._id,
+				orderNumber: newOrder.orderNumber,
+				...newOrder.toObject(),
+			},
 		});
 	} catch (error) {
 		res.status(500).json({
