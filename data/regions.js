@@ -46,7 +46,7 @@ const regions = [
 			{ id: 302, name: "Chapainawabganj" },
 			{ id: 303, name: "Natore" },
 			{ id: 304, name: "Naogaon" },
-			{ id: 305, name: "Bogura" },
+			{ id: 305, name: "Bogra" },
 			{ id: 306, name: "Pabna" },
 			{ id: 307, name: "Sirajganj" },
 			{ id: 308, name: "Joypurhat" },

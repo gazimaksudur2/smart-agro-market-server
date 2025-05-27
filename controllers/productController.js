@@ -5,14 +5,13 @@ import User from "../models/User.js";
 export const createProduct = async (req, res) => {
   try {
     const {
-      sellerId,
-      name,
+      title,
       description,
       cropType,
-      quantity,
+      pricePerUnit,
       unit,
-      price,
-      region,
+      minimumOrderQuantity,
+      availableStock,
       harvestDate,
       images,
     } = req.body;
@@ -26,20 +25,27 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    // Create new product
     const newProduct = new Product({
-      sellerId,
-      sellerName: seller.name,
-      name,
+      title,
       description,
       cropType,
-      quantity,
+      pricePerUnit,
       unit,
-      price,
-      region,
+      minimumOrderQuantity,
+      availableStock,
       harvestDate,
       images,
-      status: "pending", // Requires agent approval
+      quality,
+      tags,
+      sellerInfo: {
+        _id: seller._id,
+        name: seller.name,
+        email: seller.email,
+        phone: seller.phone,
+        region: seller.region,
+        district: seller.district,
+      },
+      status: "pending",
     });
 
     await newProduct.save();
@@ -62,6 +68,7 @@ export const getAllProducts = async (req, res) => {
     const {
       cropType,
       region,
+      district,
       minPrice,
       maxPrice,
       page = 1,
@@ -70,23 +77,24 @@ export const getAllProducts = async (req, res) => {
 
     let query = { status: "approved" };
 
-    // Apply filters
     if (cropType) query.cropType = cropType;
-    if (region) query.region = region;
+    if (region) query["sellerInfo.region"] = region;
+    if (district) query["sellerInfo.district"] = district;
 
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      query.pricePerUnit = {};
+      if (minPrice) query.pricePerUnit.$gte = parseFloat(minPrice);
+      if (maxPrice) query.pricePerUnit.$lte = parseFloat(maxPrice);
     }
 
     const maxPriceResult = await Product.aggregate([
-      { $match: { status: "approved" } }, // Optional: filter by approved products
-      { $group: { _id: null, maxPrice: { $max: "$price" } } },
+      { $match: { status: "approved" } },
+      { $group: { _id: null, maxPrice: { $max: "$pricePerUnit" } } },
     ]);
-    const existingMaxPrice = maxPriceResult.length > 0 ? maxPriceResult[0].maxPrice : 0;
 
-    // Pagination
+    const existingMaxPrice =
+      maxPriceResult.length > 0 ? maxPriceResult[0].maxPrice : 0;
+
     const options = {
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
@@ -106,7 +114,7 @@ export const getAllProducts = async (req, res) => {
       totalPages: Math.ceil(total / options.limit),
       currentPage: options.page,
       totalProducts: total,
-      maxPrice: existingMaxPrice
+      maxPrice: existingMaxPrice,
     });
   } catch (error) {
     res.status(500).json({
@@ -130,17 +138,15 @@ export const searchProducts = async (req, res) => {
 
     let query = { status: "approved" };
 
-    // Apply filters
     if (cropType) query.cropType = cropType;
-    if (region) query.region = region;
+    if (region) query["sellerInfo.region"] = region;
 
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      query.pricePerUnit = {};
+      if (minPrice) query.pricePerUnit.$gte = parseFloat(minPrice);
+      if (maxPrice) query.pricePerUnit.$lte = parseFloat(maxPrice);
     }
 
-    // Pagination
     const options = {
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
@@ -173,7 +179,6 @@ export const searchProducts = async (req, res) => {
 export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
-
     const product = await Product.findById(id);
 
     if (!product) {
@@ -195,13 +200,13 @@ export const getProductById = async (req, res) => {
   }
 };
 
+// Get crop types
 export const getCropTypes = async (req, res) => {
   try {
-    // Get unique crop types from all products
     const cropTypes = await Product.distinct("cropType", {
       cropType: { $ne: null },
     });
-    cropTypes.sort(); // Optional: sort alphabetically
+    cropTypes.sort();
 
     res.status(200).json({
       success: true,
@@ -221,9 +226,7 @@ export const approveProduct = async (req, res) => {
     const { id } = req.params;
     const agentId = req.decoded.id;
 
-    // Find the product
     const product = await Product.findById(id);
-
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -231,21 +234,19 @@ export const approveProduct = async (req, res) => {
       });
     }
 
-    // Find the agent
     const agent = await User.findById(agentId);
-
-    // Check if agent is from the same region as the product
-    if (agent.region !== product.region) {
+    if (agent.region !== product.sellerInfo.region) {
       return res.status(403).json({
         success: false,
         message: "Agent can only approve products from their assigned region",
       });
     }
 
-    // Update product status
     product.status = "approved";
-    product.approvedBy = agentId;
-    product.approvedAt = new Date();
+    product.approvedBy = {
+      agentId,
+      approvedAt: new Date(),
+    };
 
     await product.save();
 
@@ -267,7 +268,6 @@ export const deleteProduct = async (req, res) => {
     const { id } = req.params;
     const userId = req.decoded.id;
 
-    // Find the product
     const product = await Product.findById(id);
 
     if (!product) {
@@ -277,9 +277,8 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    // Check if user is the seller or an admin
     if (
-      product.sellerId.toString() !== userId &&
+      product.sellerInfo._id.toString() !== userId &&
       req.decoded.role !== "admin"
     ) {
       return res.status(403).json({

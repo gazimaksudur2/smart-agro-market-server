@@ -1,45 +1,49 @@
 import mongoose from "mongoose";
 
 const cartItemSchema = new mongoose.Schema({
-	_id: {
-		type: String,
-		required: true,
-	},
-	title: {
-		type: String,
-		required: true,
-	},
-	price: {
-		type: Number,
-		required: true,
-	},
-	unit: {
-		type: String,
-		required: true,
-	},
-	minimumOrderQuantity: {
-		type: Number,
-		required: true,
-	},
-	image: {
-		type: String,
-		required: true,
-	},
-	quantity: {
-		type: Number,
-		required: true,
-		min: 1,
-	},
-	seller: {
-		sellerId: {
-			type: String,
-			required: true,
-		},
-		name: {
-			type: String,
-			required: true,
-		},
-	},
+  _id: {
+    type: String,
+    required: true,
+  },
+  title: {
+    type: String,
+    required: true,
+  },
+  price: {
+    type: Number,
+    required: true,
+  },
+  unit: {
+    type: String,
+    required: true,
+  },
+  minimumOrderQuantity: {
+    type: Number,
+    required: true,
+  },
+  image: {
+    type: String,
+    required: true,
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
+  seller: {
+    sellerId: {
+      type: String,
+      required: true,
+    },
+    sellerName: {
+      type: String,
+      required: true,
+    },
+    sellerEmail: {
+      type: String,
+      required: true,
+    },
+  },
 });
 
 const cartSchema = new mongoose.Schema(

@@ -13,6 +13,7 @@ import jwtRoutes from "./routes/jwtRoutes.js";
 import regionRoutes from "./routes/regionRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import applicationRoutes from "./routes/applicationRoutes.js";
 
 // Import middleware
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -58,6 +59,7 @@ app.use("/jwt", jwtRoutes);
 app.use("/regions", regionRoutes);
 app.use("/carts", cartRoutes);
 app.use("/", paymentRoutes); // Payment routes are at root level for /create-payment-intent
+app.use("/applications", applicationRoutes);
 
 // Base route
 app.get("/", (req, res) => {
