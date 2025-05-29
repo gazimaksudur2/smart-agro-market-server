@@ -44,23 +44,16 @@ const userSchema = new mongoose.Schema(
 			type: String,
 			default: "https://i.ibb.co/MBtjqXQ/no-avatar.gif",
 		},
-		region: {
-			type: String,
-			required: function () {
-				return this.role === "agent";
-			},
+		operationalArea: {
+			type: Object,
+			region: { type: String, default: "Dhaka" },
+			district: { type: String, default: "Tangail" },
 		},
 		verified: {
 			type: Boolean,
-			default: function () {
-				return this.role === "admin" ? true : false;
-			},
 		},
 		warehouseAddress: {
 			type: String,
-			required: function () {
-				return this.role === "agent";
-			},
 		},
 		isActive: {
 			type: Boolean,

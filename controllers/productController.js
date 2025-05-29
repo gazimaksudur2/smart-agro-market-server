@@ -7,43 +7,27 @@ export const addProduct = async (req, res) => {
     const { sellerInfo } = req.body;
 
     // Check if seller is verified
-    const seller = await User.findById(new(sellerInfo?._id));
-    console.log(seller, req.body);
-    // if (!seller || !seller.verified) {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: "Seller must be verified by an agent before posting products",
-    //   });
-    // }
+    const seller = await User.findById(sellerInfo?._id).exec();
 
-    // const newProduct = new Product({
-    //   title,
-    //   description,
-    //   cropType,
-    //   pricePerUnit,
-    //   unit,
-    //   minimumOrderQuantity,
-    //   availableStock,
-    //   harvestDate,
-    //   images,
-    //   quality,
-    //   tags,
-    //   sellerInfo: {
-    //     _id: seller._id,
-    //     name: seller.name,
-    //     email: seller.email,
-    //     phone: seller.phone,
-    //     region: seller.region,
-    //     district: seller.district,
-    //   },
-    //   status: "pending",
-    // });
+    if (!seller) {
+      return res.status(403).json({
+        success: false,
+        message: "User data not found",
+      });
+    } else if(!seller?.verified){
+      return res.status(403).json({
+        success: false,
+        message: "Seller is not verified",
+        });
+    }
 
-    // await newProduct.save();
+    const newProduct = new Product({...req.body, quality: "D", approvedBy:{agentId: null, approvedAt: null}, averageRating: 0});
+
+    await newProduct.save();
 
     res.status(201).json({
       success: true,
-      // product: newProduct,
+      product: newProduct,
     });
   } catch (error) {
     res.status(500).json({

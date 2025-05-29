@@ -29,7 +29,16 @@ const productSchema = new mongoose.Schema(
     unit: {
       type: String,
       required: true,
-      enum: ["kg", "ton", "quintal", "piece"],
+      enum: [
+        "gram",
+        "kg",
+        "quintal",
+        "liter",
+        "piece",
+        "dozen",
+        "bundle",
+        "feet",
+      ],
     },
     minimumOrderQuantity: {
       type: Number,
@@ -41,17 +50,19 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    harvestDate: {
+    harvestedOn: {
       type: Date,
       required: true,
     },
     sellerInfo: {
-      _id: {type: String, required: true,},
+      _id: { type: String, required: true },
       name: { type: String, required: true },
       email: { type: String, required: true },
       phone: { type: String, required: true },
-      region: { type: String, required: true },
-      district: { type: String, required: true },
+      operationalArea: {
+        region: { type: String, required: true },
+        district: { type: String, required: true },
+      },
     },
     status: {
       type: String,
@@ -60,7 +71,7 @@ const productSchema = new mongoose.Schema(
     },
     quality: {
       type: String,
-      enum: ["A", "B", "C"],
+      enum: ["A", "B", "C", "D"],
       required: true,
     },
     tags: {

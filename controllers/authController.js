@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import { generateJWT, getCookieOptions } from "../middleware/auth.js";
 
+
 // Register a new user
 export const register = async (req, res) => {
 	try {
@@ -12,7 +13,7 @@ export const register = async (req, res) => {
 		} = req.body;
 
 		// Check if user already exists
-		const existingUser = await User.findOne({ email });
+		const existingUser = await User.findOne({ email }).exec();
 		if (existingUser) {
 			return res.status(400).json({
 				success: false,
@@ -24,7 +25,7 @@ export const register = async (req, res) => {
 		// Hash password
 		const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
-		// Create new user
+		// // Create new user
 		const newUser = new User({
 			...req.body,
 			password: hashedPassword,
