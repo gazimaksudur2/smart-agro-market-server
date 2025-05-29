@@ -83,7 +83,7 @@ export const login = async (req, res) => {
 		}
 
 		// Check if password exists (for OAuth users)
-		if (!user.password) {
+		if (!user.password && password) {
 			return res.status(400).json({
 				success: false,
 				message: "Please login with Google or Facebook",
@@ -91,7 +91,7 @@ export const login = async (req, res) => {
 		}
 		
 		// Verify password
-		const isMatch = await bcrypt.compare(password, user.password);
+		const isMatch = user?.provider != "email-pass" || await bcrypt.compare(password, user.password);
 
 		if (!isMatch) {
 			return res.status(401).json({
