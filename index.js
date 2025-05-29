@@ -9,7 +9,6 @@ import agentRoutes from "./routes/agentRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
-import jwtRoutes from "./routes/jwtRoutes.js";
 import regionRoutes from "./routes/regionRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
@@ -55,7 +54,6 @@ app.use("/agents", agentRoutes);
 app.use("/products", productRoutes);
 app.use("/orders", orderRoutes);
 app.use("/reviews", reviewRoutes);
-app.use("/jwt", jwtRoutes);
 app.use("/regions", regionRoutes);
 app.use("/carts", cartRoutes);
 app.use("/", paymentRoutes); // Payment routes are at root level for /create-payment-intent

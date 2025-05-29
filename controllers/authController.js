@@ -1,6 +1,6 @@
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import { generateJWT, getCookieOptions } from "../middleware/auth.js";
 
 // Register a new user
 export const register = async (req, res) => {
@@ -45,25 +45,11 @@ export const register = async (req, res) => {
 
 		await newUser.save();
 
-		// Generate JWT
-		const token = jwt.sign(
-			{ id: newUser._id, email: newUser.email, role: newUser.role },
-			process.env.JWT_SECRET || "smart_agro_connect_jwt_super_secret_key",
-			{ expiresIn: "1d" }
-		);
+		// Generate JWT using consolidated function
+		const token = generateJWT(newUser);
 
-		// Set cookie options
-		const cookieOptions = {
-			httpOnly: true,
-			secure: process.env.NODE_ENV === "production",
-			maxAge: 24 * 60 * 60 * 1000, // 1 day
-			sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-			partitioned: true,
-			path: "/",
-		};
-
-		// Set JWT as a cookie
-		res.cookie("jwt", token, cookieOptions);
+		// Set JWT as a cookie using consolidated options
+		res.cookie("jwt", token, getCookieOptions());
 
 		res.status(201).json({
 			success: true,
@@ -86,7 +72,7 @@ export const register = async (req, res) => {
 // Login user
 export const login = async (req, res) => {
 	try {
-		const { email, password } = req.body;
+		const { email, password, uid } = req.body;
 		const user = await User.findOne({ email });
 
 		if (!user) {
@@ -103,7 +89,7 @@ export const login = async (req, res) => {
 				message: "Please login with Google or Facebook",
 			});
 		}
-
+		
 		// Verify password
 		const isMatch = await bcrypt.compare(password, user.password);
 
@@ -114,25 +100,11 @@ export const login = async (req, res) => {
 			});
 		}
 
-		// Generate JWT
-		const token = jwt.sign(
-			{ id: user._id, email: user.email, role: user.role },
-			process.env.JWT_SECRET || "smart_agro_connect_jwt_super_secret_key",
-			{ expiresIn: "1d" }
-		);
+		// Generate JWT using consolidated function
+		const token = generateJWT(user);
 
-		// Set cookie options
-		const cookieOptions = {
-			httpOnly: true,
-			secure: process.env.NODE_ENV === "production",
-			maxAge: 24 * 60 * 60 * 1000, // 1 day
-			sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-			partitioned: true,
-			path: "/",
-		};
-
-		// Set JWT as a cookie
-		res.cookie("jwt", token, cookieOptions);
+		// Set JWT as a cookie using consolidated options
+		res.cookie("jwt", token, getCookieOptions());
 
 		res.status(200).json({
 			success: true,
@@ -150,6 +122,20 @@ export const login = async (req, res) => {
 			message: error.message,
 		});
 	}
+};
+
+// Logout user
+export const logout = (req, res) => {
+	res.clearCookie("jwt", {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === "production",
+		path: "/",
+	});
+
+	res.status(200).json({
+		success: true,
+		message: "Logged out successfully",
+	});
 };
 
 // Get user data

@@ -2,7 +2,7 @@ import express from "express";
 import {
 	register,
 	login,
-	// logout,
+	logout,
 	getProfile,
 	updateRole,
 	getAllAgents,
@@ -21,6 +21,9 @@ router.post("/register", register);
 
 // POST /users/login – login user
 router.post("/login", login);
+
+// POST /users/logout – logout user
+router.post("/logout", logout);
 
 // GET /users/verifyUser - Check if user exists
 router.get("/verifyUser", verifyUser);

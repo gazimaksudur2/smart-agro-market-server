@@ -1,6 +1,6 @@
 import express from "express";
 import {
-	createProduct,
+	addProduct,
 	getAllProducts,
 	searchProducts,
 	getProductById,
@@ -26,8 +26,8 @@ router.get("/:id", getProductById);
 
 
 // Protected routes
-// POST /products – seller creates product (agentVerified required)
-router.post("/create-product", verifyJWT, verifyRole(["seller"]), createProduct);
+// POST /products – seller adds product (agentVerified required)
+router.post("/add-product", verifyJWT, verifyRole(["seller"]), addProduct);
 
 // PATCH /products/approve/:id – agent approves product
 router.patch("/approve/:id", verifyJWT, verifyRole(["agent"]), approveProduct);

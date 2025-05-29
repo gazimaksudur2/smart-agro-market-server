@@ -1,58 +1,49 @@
 import Product from "../models/Product.js";
 import User from "../models/User.js";
 
-// Create a new product
-export const createProduct = async (req, res) => {
+// Add a new product
+export const addProduct = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      cropType,
-      pricePerUnit,
-      unit,
-      minimumOrderQuantity,
-      availableStock,
-      harvestDate,
-      images,
-    } = req.body;
+    const { sellerInfo } = req.body;
 
     // Check if seller is verified
-    const seller = await User.findById(sellerId);
-    if (!seller || !seller.verified) {
-      return res.status(403).json({
-        success: false,
-        message: "Seller must be verified by an agent before posting products",
-      });
-    }
+    const seller = await User.findById(new(sellerInfo?._id));
+    console.log(seller, req.body);
+    // if (!seller || !seller.verified) {
+    //   return res.status(403).json({
+    //     success: false,
+    //     message: "Seller must be verified by an agent before posting products",
+    //   });
+    // }
 
-    const newProduct = new Product({
-      title,
-      description,
-      cropType,
-      pricePerUnit,
-      unit,
-      minimumOrderQuantity,
-      availableStock,
-      harvestDate,
-      images,
-      quality,
-      tags,
-      sellerInfo: {
-        _id: seller._id,
-        name: seller.name,
-        email: seller.email,
-        phone: seller.phone,
-        region: seller.region,
-        district: seller.district,
-      },
-      status: "pending",
-    });
+    // const newProduct = new Product({
+    //   title,
+    //   description,
+    //   cropType,
+    //   pricePerUnit,
+    //   unit,
+    //   minimumOrderQuantity,
+    //   availableStock,
+    //   harvestDate,
+    //   images,
+    //   quality,
+    //   tags,
+    //   sellerInfo: {
+    //     _id: seller._id,
+    //     name: seller.name,
+    //     email: seller.email,
+    //     phone: seller.phone,
+    //     region: seller.region,
+    //     district: seller.district,
+    //   },
+    //   status: "pending",
+    // });
 
-    await newProduct.save();
+    // await newProduct.save();
 
     res.status(201).json({
       success: true,
-      product: newProduct,
+      // product: newProduct,
     });
   } catch (error) {
     res.status(500).json({
@@ -78,8 +69,8 @@ export const getAllProducts = async (req, res) => {
     let query = { status: "approved" };
 
     if (cropType) query.cropType = cropType;
-    if (region) query["sellerInfo.region"] = region;
-    if (district) query["sellerInfo.district"] = district;
+    if (region) query["sellerInfo.operationalArea.region"] = region;
+    if (district) query["sellerInfo.operationalArea.district"] = district;
 
     if (minPrice || maxPrice) {
       query.pricePerUnit = {};
@@ -139,7 +130,7 @@ export const searchProducts = async (req, res) => {
     let query = { status: "approved" };
 
     if (cropType) query.cropType = cropType;
-    if (region) query["sellerInfo.region"] = region;
+    if (region) query["sellerInfo.operationalArea.region"] = region;
 
     if (minPrice || maxPrice) {
       query.pricePerUnit = {};
@@ -235,7 +226,7 @@ export const approveProduct = async (req, res) => {
     }
 
     const agent = await User.findById(agentId);
-    if (agent.region !== product.sellerInfo.region) {
+    if (agent.region !== product.sellerInfo.operationalArea.region) {
       return res.status(403).json({
         success: false,
         message: "Agent can only approve products from their assigned region",
