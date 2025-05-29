@@ -6,15 +6,9 @@ import { generateJWT, getCookieOptions } from "../middleware/auth.js";
 export const register = async (req, res) => {
 	try {
 		const {
-			name,
 			email,
 			password,
-			provider,
-			role,
-			phoneNumber,
-			address,
-			firebaseUID,
-			profilePicture,
+			role
 		} = req.body;
 
 		// Check if user already exists
@@ -32,15 +26,9 @@ export const register = async (req, res) => {
 
 		// Create new user
 		const newUser = new User({
-			name,
-			email,
+			...req.body,
 			password: hashedPassword,
-			provider,
 			role: role || "consumer",
-			phoneNumber,
-			address,
-			firebaseUID,
-			profilePicture,
 		});
 
 		await newUser.save();
