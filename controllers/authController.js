@@ -25,10 +25,15 @@ export const register = async (req, res) => {
 		// Hash password
 		const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
-		// // Create new user
+		// Create new user
 		const newUser = new User({
 			...req.body,
 			password: hashedPassword,
+			verified: false,
+			operationalArea: {
+				region: "",
+				district: "",
+			},
 			role: role || "consumer",
 		});
 
@@ -38,7 +43,7 @@ export const register = async (req, res) => {
 		const token = generateJWT(newUser);
 
 		// Set JWT as a cookie using consolidated options
-		res.cookie("jwt", token, getCookieOptions());
+		res.cookie("JWT_TOKEN_KEY", token, getCookieOptions());
 
 		res.status(201).json({
 			success: true,
@@ -93,7 +98,7 @@ export const login = async (req, res) => {
 		const token = generateJWT(user);
 
 		// Set JWT as a cookie using consolidated options
-		res.cookie("jwt", token, getCookieOptions());
+		res.cookie("JWT_TOKEN_KEY", token, getCookieOptions());
 
 		res.status(200).json({
 			success: true,
@@ -115,11 +120,11 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = (req, res) => {
-	res.clearCookie("jwt", {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
-		path: "/",
-	});
+	res.clearCookie("JWT_TOKEN_KEY", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
 
 	res.status(200).json({
 		success: true,

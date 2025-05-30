@@ -26,7 +26,8 @@ export const getCookieOptions = () => ({
 });
 
 export const verifyJWT = (req, res, next) => {
-	const token = req.cookies.jwt || req.headers.authorization?.split(" ")[1];
+	const token =
+    req.cookies.JWT_TOKEN_KEY || req.headers.authorization?.split(" ")[1];
 
 	if (!token) {
 		return res.status(401).json({ message: "Unauthorized access" });

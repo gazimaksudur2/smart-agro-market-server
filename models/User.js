@@ -46,8 +46,8 @@ const userSchema = new mongoose.Schema(
 		},
 		operationalArea: {
 			type: Object,
-			region: { type: String, default: "Dhaka" },
-			district: { type: String, default: "Tangail" },
+			region: { type: String, default: "" },
+			district: { type: String, default: "" },
 		},
 		verified: {
 			type: Boolean,
