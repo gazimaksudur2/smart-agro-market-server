@@ -50,3 +50,21 @@ export const verifyRole = (roles) => {
 		next();
 	};
 };
+
+export const verifyUserEmail = (req, res, next) => {
+  const email = req.query.email || req.params.email;
+  if (!email) {
+    return res.status(400).json({ message: "Missing email parameter" });
+  }
+
+  const tokenEmail = String(req.decoded?.email || "")
+    .toLowerCase()
+    .trim();
+  const paramEmail = String(email).toLowerCase().trim();
+
+  if (tokenEmail !== paramEmail) {
+    return res.status(403).json({ message: "Forbidden access" });
+  }
+  next();
+};
+  

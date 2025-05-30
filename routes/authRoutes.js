@@ -10,8 +10,9 @@ import {
 	getUserWithEmail,
 	verifyUser,
 	updateUserProfile,
+	updatePassword
 } from "../controllers/authController.js";
-import { verifyJWT, verifyRole } from "../middleware/auth.js";
+import { verifyJWT, verifyRole, verifyUserEmail } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -39,7 +40,9 @@ router.get("/agents/:region", getAgentByRegion);
 router.get("/:email", verifyJWT, getUserWithEmail);
 
 // PATCH /users/:email - Update user profile
-router.patch("/:email", verifyJWT, updateUserProfile);
+router.patch("/:email", verifyJWT, verifyUserEmail, updateUserProfile);
+
+router.patch("/updatePassword/:email", verifyJWT, verifyUserEmail, updatePassword);
 
 // GET /users/profile – get profile (protected)
 router.get("/profile", verifyJWT, getProfile);

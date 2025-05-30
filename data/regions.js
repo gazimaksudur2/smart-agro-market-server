@@ -21,10 +21,10 @@ const regions = [
 	},
 	{
 		id: 2,
-		name: "Chittagong",
+		name: "Chottogram",
 		type: "division",
 		districts: [
-			{ id: 201, name: "Chittagong" },
+			{ id: 201, name: "Chottogram" },
 			{ id: 202, name: "Cox's Bazar" },
 			{ id: 203, name: "Rangamati" },
 			{ id: 204, name: "Bandarban" },

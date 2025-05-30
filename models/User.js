@@ -40,6 +40,11 @@ const userSchema = new mongoose.Schema(
 			zip: String,
 			country: { type: String, default: "Bangladesh" },
 		},
+		fullAddress: {
+			type: String,
+			required: false,
+			trim: true,
+		},
 		profilePicture: {
 			type: String,
 			default: "https://i.ibb.co/MBtjqXQ/no-avatar.gif",
