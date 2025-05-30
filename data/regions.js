@@ -21,10 +21,10 @@ const regions = [
 	},
 	{
 		id: 2,
-		name: "Chottogram",
+		name: "Chattogram",
 		type: "division",
 		districts: [
-			{ id: 201, name: "Chottogram" },
+			{ id: 201, name: "Chattogram" },
 			{ id: 202, name: "Cox's Bazar" },
 			{ id: 203, name: "Rangamati" },
 			{ id: 204, name: "Bandarban" },

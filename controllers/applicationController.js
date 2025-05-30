@@ -25,13 +25,11 @@ export const submitApplication = async (req, res) => {
 					.status(400)
 					.json({ success: false, message: "Application already in review" });
 			}
-			return res
-				.status(400)
-				.json({
-					success: false,
-					message:
-						"Your Application is pending. Don't make duplicate applications.",
-				});
+			return res.status(400).json({
+				success: false,
+				message:
+					"Your Application is pending. Don't make duplicate applications.",
+			});
 		}
 
 		const newApplication = new Application({
@@ -100,34 +98,377 @@ export const getApplicationById = async (req, res) => {
 	}
 };
 
-// Get all applications (for admins/reviewers)
+// Get all applications (for admins/reviewers) - ENHANCED with better query support
 export const getAllApplications = async (req, res) => {
 	try {
-		const { status, type, page = 1, limit = 10 } = req.query;
-		const query = {};
-		if (status) query.status = status;
-		if (type) query.applicationType = type;
+		const {
+			status,
+			type,
+			applicationType,
+			search,
+			region,
+			page = 1,
+			limit = 10,
+			sortBy = "createdAt",
+			sortOrder = "desc",
+		} = req.query;
 
+		// Build query object
+		const query = {};
+
+		// Filter by status if specified
+		if (status && status !== "all") {
+			query.status = status;
+		}
+
+		// Filter by application type if specified (support both 'type' and 'applicationType')
+		if (type && type !== "all") {
+			query.applicationType = type;
+		}
+		if (applicationType && applicationType !== "all") {
+			query.applicationType = applicationType;
+		}
+
+		// Filter by region if specified
+		if (region && region !== "all") {
+			query["operationalArea.region"] = region;
+		}
+
+		// Search by applicant name or email if specified
+		if (search && search.trim()) {
+			query.$or = [
+				{ applicantName: { $regex: search.trim(), $options: "i" } },
+				{ applicantEmail: { $regex: search.trim(), $options: "i" } },
+			];
+		}
+
+		// Calculate pagination
+		const pageNumber = parseInt(page);
+		const pageSize = parseInt(limit);
+		const skip = (pageNumber - 1) * pageSize;
+
+		// Sort options
+		const sortOptions = {};
+		sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
+
+		// Execute query with pagination
 		const applications = await Application.find(query)
-			.sort({ createdAt: -1 })
-			.limit(limit * 1)
-			.skip((page - 1) * limit)
+			.sort(sortOptions)
+			.skip(skip)
+			.limit(pageSize)
 			.exec();
 
-		const count = await Application.countDocuments(query);
+		// Get total count for pagination
+		const totalApplications = await Application.countDocuments(query);
+		const totalPages = Math.ceil(totalApplications / pageSize);
 
 		res.json({
 			success: true,
 			applications,
-			totalPages: Math.ceil(count / limit),
-			currentPage: parseInt(page),
-			totalApplications: count,
+			totalApplications,
+			totalPages,
+			currentPage: pageNumber,
+			pageSize,
 		});
 	} catch (error) {
 		console.error("Error fetching all applications:", error);
 		res
 			.status(500)
 			.json({ success: false, message: "Server error.", error: error.message });
+	}
+};
+
+// HIGH PRIORITY: Approve Application (dedicated endpoint)
+export const approveApplication = async (req, res) => {
+	try {
+		const { id } = req.params;
+		const { reason = "Application approved", adminId } = req.body;
+		const reviewerId = adminId || req.decoded.id;
+
+		const application = await Application.findById(id);
+		if (!application) {
+			return res
+				.status(404)
+				.json({ success: false, message: "Application not found." });
+		}
+
+		// Update application status
+		application.status = "approved";
+		application.reviewedAt = new Date();
+		application.reviewedBy = reviewerId;
+		application.reviewNotes = reason;
+
+		// Update user role based on application type
+		const userToUpdate = await User.findById(application.applicantId);
+		if (userToUpdate) {
+			let newRole = userToUpdate.role;
+
+			if (application.applicationType === "seller-application" || application.applicationType === "agent-application") {
+				// Update region and district for sellers & agents 
+				userToUpdate.operationalArea = {
+					region: application.operationalArea.region,
+					district: application.operationalArea.district,
+				};
+				newRole = application.applicationType === "seller-application" ? "seller" : "agent";
+        if(application.applicationType === "agent-application"){
+          userToUpdate.verified = true;
+        }
+			} else if (application.applicationType === "admin-application") {
+				newRole = "admin";
+			}
+
+			userToUpdate.role = newRole;
+			await userToUpdate.save();
+
+			console.log(
+				`Application ${application._id} approved. User ${application.applicantId} role updated to ${newRole}.`
+			);
+		}
+
+		await application.save();
+
+		res.json({
+			success: true,
+			message: "Application approved successfully.",
+			application,
+			userUpdated: {
+				userId: userToUpdate._id,
+				newRole: userToUpdate.role,
+				operationalArea: userToUpdate.operationalArea,
+			},
+		});
+	} catch (error) {
+		console.error("Error approving application:", error);
+		res.status(500).json({
+			success: false,
+			message: "Server error while approving application.",
+			error: error.message,
+		});
+	}
+};
+
+// HIGH PRIORITY: Reject Application (dedicated endpoint)
+export const rejectApplication = async (req, res) => {
+	try {
+		const { id } = req.params;
+		const { reason, adminId } = req.body;
+		const reviewerId = adminId || req.decoded.id;
+
+		if (!reason || reason.trim().length === 0) {
+			return res.status(400).json({
+				success: false,
+				message: "Reason for rejection is required.",
+			});
+		}
+
+		const application = await Application.findById(id);
+		if (!application) {
+			return res
+				.status(404)
+				.json({ success: false, message: "Application not found." });
+		}
+
+		// Update application status
+		application.status = "rejected";
+		application.reviewedAt = new Date();
+		application.reviewedBy = reviewerId;
+		application.reviewNotes = reason;
+
+		await application.save();
+
+		res.json({
+			success: true,
+			message: "Application rejected successfully.",
+			application,
+		});
+	} catch (error) {
+		console.error("Error rejecting application:", error);
+		res.status(500).json({
+			success: false,
+			message: "Server error while rejecting application.",
+			error: error.message,
+		});
+	}
+};
+
+// MEDIUM PRIORITY: Bulk Actions
+export const bulkApplicationAction = async (req, res) => {
+	try {
+		const {
+			applicationIds,
+			action,
+			reason = "Bulk action performed",
+		} = req.body;
+		const adminId = req.decoded.id;
+
+		// Validate input
+		if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
+			return res.status(400).json({
+				success: false,
+				message: "Application IDs array is required",
+			});
+		}
+
+		if (!["approve", "reject"].includes(action)) {
+			return res.status(400).json({
+				success: false,
+				message: "Invalid action. Must be 'approve' or 'reject'",
+			});
+		}
+
+		if (action === "reject" && (!reason || reason.trim().length === 0)) {
+			return res.status(400).json({
+				success: false,
+				message: "Reason is required for bulk rejection",
+			});
+		}
+
+		const results = {
+			successful: [],
+			failed: [],
+			total: applicationIds.length,
+		};
+
+		// Process each application
+		for (const appId of applicationIds) {
+			try {
+				const application = await Application.findById(appId);
+				if (!application) {
+					results.failed.push({
+						applicationId: appId,
+						error: "Application not found",
+					});
+					continue;
+				}
+
+				// Update application
+				application.status = action === "approve" ? "approved" : "rejected";
+				application.reviewedAt = new Date();
+				application.reviewedBy = adminId;
+				application.reviewNotes = reason;
+
+				// If approving, update user role
+				if (action === "approve") {
+					const userToUpdate = await User.findById(application.applicantId);
+					if (userToUpdate) {
+						let newRole = userToUpdate.role;
+
+						if (application.applicationType === "seller-application") {
+							newRole = "seller";
+						} else if (application.applicationType === "agent-application") {
+							newRole = "agent";
+							userToUpdate.operationalArea = {
+								region: application.operationalArea.region,
+								district: application.operationalArea.district,
+							};
+						} else if (application.applicationType === "admin-application") {
+							newRole = "admin";
+						}
+
+						userToUpdate.role = newRole;
+						await userToUpdate.save();
+					}
+				}
+
+				await application.save();
+				results.successful.push(appId);
+			} catch (error) {
+				results.failed.push({
+					applicationId: appId,
+					error: error.message,
+				});
+			}
+		}
+
+		res.json({
+			success: true,
+			message: `Bulk ${action} completed`,
+			results,
+		});
+	} catch (error) {
+		console.error("Error performing bulk application action:", error);
+		res.status(500).json({
+			success: false,
+			message: "Server error while performing bulk action.",
+			error: error.message,
+		});
+	}
+};
+
+// MEDIUM PRIORITY: Application Statistics
+export const getApplicationStatistics = async (req, res) => {
+	try {
+		// Basic counts
+		const total = await Application.countDocuments();
+		const pending = await Application.countDocuments({ status: "pending" });
+		const approved = await Application.countDocuments({ status: "approved" });
+		const rejected = await Application.countDocuments({ status: "rejected" });
+		const inReview = await Application.countDocuments({ status: "in-review" });
+
+		// By application type
+		const byTypeStats = await Application.aggregate([
+			{
+				$group: {
+					_id: "$applicationType",
+					count: { $sum: 1 },
+				},
+			},
+		]);
+
+		// By region
+		const byRegionStats = await Application.aggregate([
+			{
+				$group: {
+					_id: "$operationalArea.region",
+					count: { $sum: 1 },
+				},
+			},
+		]);
+
+		// By status and type combined
+		const statusTypeStats = await Application.aggregate([
+			{
+				$group: {
+					_id: {
+						status: "$status",
+						type: "$applicationType",
+					},
+					count: { $sum: 1 },
+				},
+			},
+		]);
+
+		res.json({
+			success: true,
+			message: "Application statistics retrieved successfully",
+			statistics: {
+				total,
+				pending,
+				approved,
+				rejected,
+				inReview,
+				byType: byTypeStats.reduce((acc, item) => {
+					acc[item._id] = item.count;
+					return acc;
+				}, {}),
+				byRegion: byRegionStats.reduce((acc, item) => {
+					acc[item._id || "Unknown"] = item.count;
+					return acc;
+				}, {}),
+				statusByType: statusTypeStats.reduce((acc, item) => {
+					const key = `${item._id.status}_${item._id.type}`;
+					acc[key] = item.count;
+					return acc;
+				}, {}),
+			},
+		});
+	} catch (error) {
+		console.error("Error fetching application statistics:", error);
+		res.status(500).json({
+			success: false,
+			message: "Server error while fetching statistics.",
+			error: error.message,
+		});
 	}
 };
 
