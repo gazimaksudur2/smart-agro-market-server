@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import agentRoutes from "./routes/agentRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
@@ -50,6 +51,7 @@ app.use(cookieParser());
 
 // Routes
 app.use("/users", authRoutes);
+app.use("/admin", adminRoutes);
 app.use("/agents", agentRoutes);
 app.use("/products", productRoutes);
 app.use("/orders", orderRoutes);

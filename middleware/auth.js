@@ -27,7 +27,7 @@ export const getCookieOptions = () => ({
 
 export const verifyJWT = (req, res, next) => {
 	const token =
-    req.cookies.JWT_TOKEN_KEY || req.headers.authorization?.split(" ")[1];
+		req.cookies.JWT_TOKEN_KEY || req.headers.authorization?.split(" ")[1];
 
 	if (!token) {
 		return res.status(401).json({ message: "Unauthorized access" });
@@ -52,19 +52,15 @@ export const verifyRole = (roles) => {
 };
 
 export const verifyUserEmail = (req, res, next) => {
-  const email = req.query.email || req.params.email;
-  if (!email) {
-    return res.status(400).json({ message: "Missing email parameter" });
-  }
+	const emailFromParams = req.params.email;
+	const emailFromToken = req.decoded.email;
 
-  const tokenEmail = String(req.decoded?.email || "")
-    .toLowerCase()
-    .trim();
-  const paramEmail = String(email).toLowerCase().trim();
-
-  if (tokenEmail !== paramEmail) {
-    return res.status(403).json({ message: "Forbidden access" });
-  }
-  next();
+	// Allow if user is accessing their own data or if user is admin
+	if (emailFromParams === emailFromToken || req.decoded.role === "admin") {
+		next();
+	} else {
+		return res.status(403).json({
+			message: "Access denied: You can only access your own data",
+		});
+	}
 };
-  

@@ -5,10 +5,11 @@ import {
 	searchProducts,
 	getProductById,
 	getCropTypes,
+	getProductsBySeller,
 	approveProduct,
 	deleteProduct,
 } from "../controllers/productController.js";
-import { verifyJWT, verifyRole } from "../middleware/auth.js";
+import { verifyJWT, verifyRole, verifyUserEmail } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -21,8 +22,11 @@ router.get("/search", searchProducts);
 
 router.get("/crop-types", getCropTypes);
 
+router.get("/seller/:email", verifyJWT, verifyUserEmail, getProductsBySeller)
+
 // GET /products/:id – product details
 router.get("/:id", getProductById);
+
 
 
 // Protected routes

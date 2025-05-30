@@ -14,14 +14,19 @@ export const addProduct = async (req, res) => {
         success: false,
         message: "User data not found",
       });
-    } else if(!seller?.verified){
+    } else if (!seller?.verified) {
       return res.status(403).json({
         success: false,
         message: "Seller is not verified",
-        });
+      });
     }
 
-    const newProduct = new Product({...req.body, quality: "D", approvedBy:{agentId: null, approvedAt: null}, averageRating: 0});
+    const newProduct = new Product({
+      ...req.body,
+      quality: "D",
+      approvedBy: { agentId: null, approvedAt: null },
+      averageRating: 0,
+    });
 
     await newProduct.save();
 
@@ -166,6 +171,29 @@ export const getProductById = async (req, res) => {
     res.status(200).json({
       success: true,
       product,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get Seller Products
+export const getProductsBySeller = async (req, res) => {
+  const { email } = req.params;
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing seller email in URL",
+    });
+  }
+  try {
+    const products = await Product.find({ 'sellerInfo.email': email }).lean();
+    res.status(200).json({
+      success: true,
+      products,
     });
   } catch (error) {
     res.status(500).json({
