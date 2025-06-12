@@ -1,4 +1,4 @@
-import Application from "../models/applicationModel.js";
+import Application from "../models/Application.js";
 import User from "../models/User.js"; // Assuming User model path
 import Seller from "../models/Seller.js";
 import Agent from "../models/Agent.js";
@@ -263,20 +263,25 @@ export const approveApplication = async (req, res) => {
 				email: application.applicantEmail,
 				phoneNumber: userToUpdate.phoneNumber || "",
 				profilePicture: application.applicantImg,
-				address: userToUpdate.address || {},
 				fullAddress: userToUpdate.fullAddress || "",
-				applicationId: application._id,
+				applicationId: application._id.toString(),
 				operationalArea: application.operationalArea,
 				formData: application.formData,
 				businessName: application.formData.businessName || "Unknown Business",
 				businessType: application.formData.businessType || "farm",
-				businessLicense: application.formData.businessLicense || {},
-				farmDetails: application.formData.farmDetails || {},
-				bankDetails: application.formData.bankDetails || {},
-				taxInfo: application.formData.taxInfo || {},
+				farmDetails: application.formData.farmDetails || {
+					farmSize: 0,
+					cropTypes: [],
+					organicCertified: false,
+				},
+				bankDetails: application.formData.bankDetails || {
+					accountHolderName: "",
+					bankName: "",
+					accountNumber: "",
+				},
+				verified: true, // Set to true since application is approved
 				approvedBy: reviewerId,
 				approvedAt: new Date(),
-				approvalNotes: reason,
 			};
 
 			const newSeller = new Seller(sellerData);
@@ -303,19 +308,19 @@ export const approveApplication = async (req, res) => {
 				email: application.applicantEmail,
 				phoneNumber: userToUpdate.phoneNumber || "",
 				profilePicture: application.applicantImg,
-				address: userToUpdate.address || {},
 				fullAddress: userToUpdate.fullAddress || "",
-				applicationId: application._id,
+				applicationId: application._id.toString(),
 				operationalArea: application.operationalArea,
 				formData: application.formData,
 				agentId: agentId,
 				specialization: application.formData.specialization || ["crops"],
-				qualifications: application.formData.qualifications || {},
-				languagesSpoken: application.formData.languagesSpoken || [],
-				availability: application.formData.availability || {},
+				experience: {
+					totalYears: application.formData.experience?.totalYears || 0,
+					description: application.formData.experience?.description || "",
+				},
+				verified: true, // Set to true since application is approved
 				approvedBy: reviewerId,
 				approvedAt: new Date(),
-				approvalNotes: reason,
 			};
 
 			const newAgent = new Agent(agentData);
@@ -343,18 +348,20 @@ export const approveApplication = async (req, res) => {
 				email: application.applicantEmail,
 				phoneNumber: userToUpdate.phoneNumber || "",
 				profilePicture: application.applicantImg,
-				address: userToUpdate.address || {},
 				fullAddress: userToUpdate.fullAddress || "",
-				applicationId: application._id,
+				applicationId: application._id.toString(),
 				operationalArea: application.operationalArea,
 				formData: application.formData,
 				adminId: adminId,
+				adminLevel: application.formData.adminLevel || "junior",
 				department: application.formData.department || "operations",
-				qualifications: application.formData.qualifications || {},
-				permissions: application.formData.permissions || {},
+				experience: {
+					totalYears: application.formData.experience?.totalYears || 0,
+					description: application.formData.experience?.description || "",
+				},
+				verified: true, // Set to true since application is approved
 				approvedBy: reviewerId,
 				approvedAt: new Date(),
-				approvalNotes: reason,
 			};
 
 			const newAdmin = new Admin(adminData);
@@ -516,21 +523,26 @@ export const bulkApplicationAction = async (req, res) => {
 								email: application.applicantEmail,
 								phoneNumber: userToUpdate.phoneNumber || "",
 								profilePicture: application.applicantImg,
-								address: userToUpdate.address || {},
 								fullAddress: userToUpdate.fullAddress || "",
-								applicationId: application._id,
+								applicationId: application._id.toString(),
 								operationalArea: application.operationalArea,
 								formData: application.formData,
 								businessName:
 									application.formData.businessName || "Unknown Business",
 								businessType: application.formData.businessType || "farm",
-								businessLicense: application.formData.businessLicense || {},
-								farmDetails: application.formData.farmDetails || {},
-								bankDetails: application.formData.bankDetails || {},
-								taxInfo: application.formData.taxInfo || {},
+								farmDetails: application.formData.farmDetails || {
+									farmSize: 0,
+									cropTypes: [],
+									organicCertified: false,
+								},
+								bankDetails: application.formData.bankDetails || {
+									accountHolderName: "",
+									bankName: "",
+									accountNumber: "",
+								},
+								verified: true, // Set to true since application is approved
 								approvedBy: adminId,
 								approvedAt: new Date(),
-								approvalNotes: reason,
 							};
 
 							const newSeller = new Seller(sellerData);
@@ -556,21 +568,22 @@ export const bulkApplicationAction = async (req, res) => {
 								email: application.applicantEmail,
 								phoneNumber: userToUpdate.phoneNumber || "",
 								profilePicture: application.applicantImg,
-								address: userToUpdate.address || {},
 								fullAddress: userToUpdate.fullAddress || "",
-								applicationId: application._id,
+								applicationId: application._id.toString(),
 								operationalArea: application.operationalArea,
 								formData: application.formData,
 								agentId: agentId,
 								specialization: application.formData.specialization || [
 									"crops",
 								],
-								qualifications: application.formData.qualifications || {},
-								languagesSpoken: application.formData.languagesSpoken || [],
-								availability: application.formData.availability || {},
+								experience: {
+									totalYears: application.formData.experience?.totalYears || 0,
+									description:
+										application.formData.experience?.description || "",
+								},
+								verified: true, // Set to true since application is approved
 								approvedBy: adminId,
 								approvedAt: new Date(),
-								approvalNotes: reason,
 							};
 
 							const newAgent = new Agent(agentData);
@@ -586,7 +599,7 @@ export const bulkApplicationAction = async (req, res) => {
 						} else if (application.applicationType === "admin-application") {
 							// Generate unique admin ID
 							const adminCount = await Admin.countDocuments();
-							const adminId = `ADM-${Date.now()}-${String(
+							const generatedAdminId = `ADM-${Date.now()}-${String(
 								adminCount + 1
 							).padStart(4, "0")}`;
 
@@ -597,18 +610,21 @@ export const bulkApplicationAction = async (req, res) => {
 								email: application.applicantEmail,
 								phoneNumber: userToUpdate.phoneNumber || "",
 								profilePicture: application.applicantImg,
-								address: userToUpdate.address || {},
 								fullAddress: userToUpdate.fullAddress || "",
-								applicationId: application._id,
+								applicationId: application._id.toString(),
 								operationalArea: application.operationalArea,
 								formData: application.formData,
-								adminId: adminId,
+								adminId: generatedAdminId,
+								adminLevel: application.formData.adminLevel || "junior",
 								department: application.formData.department || "operations",
-								qualifications: application.formData.qualifications || {},
-								permissions: application.formData.permissions || {},
+								experience: {
+									totalYears: application.formData.experience?.totalYears || 0,
+									description:
+										application.formData.experience?.description || "",
+								},
+								verified: true, // Set to true since application is approved
 								approvedBy: adminId,
 								approvedAt: new Date(),
-								approvalNotes: reason,
 							};
 
 							const newAdmin = new Admin(adminData);

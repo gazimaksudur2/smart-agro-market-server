@@ -50,7 +50,6 @@ const userSchema = new mongoose.Schema(
 			default: "https://i.ibb.co/MBtjqXQ/no-avatar.gif",
 		},
 		operationalArea: {
-			type: Object,
 			region: { type: String, default: "" },
 			district: { type: String, default: "" },
 		},
