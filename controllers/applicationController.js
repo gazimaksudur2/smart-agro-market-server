@@ -1,5 +1,8 @@
 import Application from "../models/applicationModel.js";
 import User from "../models/User.js"; // Assuming User model path
+import Seller from "../models/Seller.js";
+import Agent from "../models/Agent.js";
+import Admin from "../models/Admin.js";
 
 // Submit a new application
 export const submitApplication = async (req, res) => {
@@ -107,6 +110,7 @@ export const getAllApplications = async (req, res) => {
 			applicationType,
 			search,
 			region,
+			district,
 			page = 1,
 			limit = 10,
 			sortBy = "createdAt",
@@ -116,25 +120,58 @@ export const getAllApplications = async (req, res) => {
 		// Build query object
 		const query = {};
 
-		// Filter by status if specified
-		if (status && status !== "all") {
-			query.status = status;
-		}
+		// Role-based filtering
+		const userRole = req.decoded.role;
 
-		// Filter by application type if specified (support both 'type' and 'applicationType')
-		if (type && type !== "all") {
-			query.applicationType = type;
-		}
-		if (applicationType && applicationType !== "all") {
-			query.applicationType = applicationType;
-		}
+		if (userRole === "agent") {
+			// Agents can only see seller-applications from their region and district
+			query.applicationType = "seller-application";
 
-		// Filter by region if specified
-		if (region && region !== "all") {
+			// Agent must provide region and district in query params
+			if (!region || !district) {
+				return res.status(400).json({
+					success: false,
+					message:
+						"Agents must provide region and district in query parameters",
+				});
+			}
+
 			query["operationalArea.region"] = region;
+			query["operationalArea.district"] = district;
+		} else if (userRole === "admin") {
+			// Admins can see all applications with optional filtering
+
+			// Filter by status if specified
+			if (status && status !== "all") {
+				query.status = status;
+			}
+
+			// Filter by application type if specified (support both 'type' and 'applicationType')
+			if (type && type !== "all") {
+				query.applicationType = type;
+			}
+			if (applicationType && applicationType !== "all") {
+				query.applicationType = applicationType;
+			}
+
+			// Filter by region if specified
+			if (region && region !== "all") {
+				query["operationalArea.region"] = region;
+			}
+
+			// Filter by district if specified
+			if (district && district !== "all") {
+				query["operationalArea.district"] = district;
+			}
+		} else {
+			// Other roles are not authorized
+			return res.status(403).json({
+				success: false,
+				message: "Access denied. Only admins and agents can view applications.",
+			});
 		}
 
-		// Search by applicant name or email if specified
+		// Search by applicant name or email if specified (available for both roles)
 		if (search && search.trim()) {
 			query.$or = [
 				{ applicantName: { $regex: search.trim(), $options: "i" } },
@@ -169,6 +206,14 @@ export const getAllApplications = async (req, res) => {
 			totalPages,
 			currentPage: pageNumber,
 			pageSize,
+			userRole, // Include user role in response for frontend reference
+			appliedFilters: {
+				...(userRole === "agent" && {
+					restrictedTo: "seller-applications",
+					region,
+					district,
+				}),
+			},
 		});
 	} catch (error) {
 		console.error("Error fetching all applications:", error);
@@ -200,32 +245,133 @@ export const approveApplication = async (req, res) => {
 
 		// Update user role based on application type
 		const userToUpdate = await User.findById(application.applicantId);
-		if (userToUpdate) {
-			let newRole = userToUpdate.role;
-
-			if (application.applicationType === "seller-application" || application.applicationType === "agent-application") {
-				// Update region and district for sellers & agents 
-				userToUpdate.operationalArea = {
-					region: application.operationalArea.region,
-					district: application.operationalArea.district,
-				};
-				newRole = application.applicationType === "seller-application" ? "seller" : "agent";
-        if(application.applicationType === "agent-application"){
-          userToUpdate.verified = true;
-        }
-			} else if (application.applicationType === "admin-application") {
-				newRole = "admin";
-			}
-
-			userToUpdate.role = newRole;
-			await userToUpdate.save();
-
-			console.log(
-				`Application ${application._id} approved. User ${application.applicantId} role updated to ${newRole}.`
-			);
+		if (!userToUpdate) {
+			return res.status(404).json({
+				success: false,
+				message: "User not found for this application.",
+			});
 		}
 
+		let newRole = userToUpdate.role;
+		let createdRecord = null;
+
+		if (application.applicationType === "seller-application") {
+			// Create Seller record
+			const sellerData = {
+				userId: application.applicantId,
+				name: application.applicantName,
+				email: application.applicantEmail,
+				phoneNumber: userToUpdate.phoneNumber || "",
+				profilePicture: application.applicantImg,
+				address: userToUpdate.address || {},
+				fullAddress: userToUpdate.fullAddress || "",
+				applicationId: application._id,
+				operationalArea: application.operationalArea,
+				formData: application.formData,
+				businessName: application.formData.businessName || "Unknown Business",
+				businessType: application.formData.businessType || "farm",
+				businessLicense: application.formData.businessLicense || {},
+				farmDetails: application.formData.farmDetails || {},
+				bankDetails: application.formData.bankDetails || {},
+				taxInfo: application.formData.taxInfo || {},
+				approvedBy: reviewerId,
+				approvedAt: new Date(),
+				approvalNotes: reason,
+			};
+
+			const newSeller = new Seller(sellerData);
+			createdRecord = await newSeller.save();
+			newRole = "seller";
+
+			// Update user operational area
+			userToUpdate.operationalArea = {
+				region: application.operationalArea.region,
+				district: application.operationalArea.district,
+			};
+		} else if (application.applicationType === "agent-application") {
+			// Generate unique agent ID
+			const agentCount = await Agent.countDocuments();
+			const agentId = `AGT-${Date.now()}-${String(agentCount + 1).padStart(
+				4,
+				"0"
+			)}`;
+
+			// Create Agent record
+			const agentData = {
+				userId: application.applicantId,
+				name: application.applicantName,
+				email: application.applicantEmail,
+				phoneNumber: userToUpdate.phoneNumber || "",
+				profilePicture: application.applicantImg,
+				address: userToUpdate.address || {},
+				fullAddress: userToUpdate.fullAddress || "",
+				applicationId: application._id,
+				operationalArea: application.operationalArea,
+				formData: application.formData,
+				agentId: agentId,
+				specialization: application.formData.specialization || ["crops"],
+				qualifications: application.formData.qualifications || {},
+				languagesSpoken: application.formData.languagesSpoken || [],
+				availability: application.formData.availability || {},
+				approvedBy: reviewerId,
+				approvedAt: new Date(),
+				approvalNotes: reason,
+			};
+
+			const newAgent = new Agent(agentData);
+			createdRecord = await newAgent.save();
+			newRole = "agent";
+
+			// Update user operational area and set verified
+			userToUpdate.operationalArea = {
+				region: application.operationalArea.region,
+				district: application.operationalArea.district,
+			};
+			userToUpdate.verified = true;
+		} else if (application.applicationType === "admin-application") {
+			// Generate unique admin ID
+			const adminCount = await Admin.countDocuments();
+			const adminId = `ADM-${Date.now()}-${String(adminCount + 1).padStart(
+				4,
+				"0"
+			)}`;
+
+			// Create Admin record
+			const adminData = {
+				userId: application.applicantId,
+				name: application.applicantName,
+				email: application.applicantEmail,
+				phoneNumber: userToUpdate.phoneNumber || "",
+				profilePicture: application.applicantImg,
+				address: userToUpdate.address || {},
+				fullAddress: userToUpdate.fullAddress || "",
+				applicationId: application._id,
+				operationalArea: application.operationalArea,
+				formData: application.formData,
+				adminId: adminId,
+				department: application.formData.department || "operations",
+				qualifications: application.formData.qualifications || {},
+				permissions: application.formData.permissions || {},
+				approvedBy: reviewerId,
+				approvedAt: new Date(),
+				approvalNotes: reason,
+			};
+
+			const newAdmin = new Admin(adminData);
+			createdRecord = await newAdmin.save();
+			newRole = "admin";
+		}
+
+		// Update user role
+		userToUpdate.role = newRole;
+		await userToUpdate.save();
+
+		// Save application
 		await application.save();
+
+		console.log(
+			`Application ${application._id} approved. User ${application.applicantId} role updated to ${newRole}.`
+		);
 
 		res.json({
 			success: true,
@@ -236,6 +382,14 @@ export const approveApplication = async (req, res) => {
 				newRole: userToUpdate.role,
 				operationalArea: userToUpdate.operationalArea,
 			},
+			createdRecord: createdRecord
+				? {
+						type: newRole,
+						id: createdRecord._id,
+						[newRole + "Id"]:
+							createdRecord[newRole === "seller" ? "userId" : newRole + "Id"],
+				  }
+				: null,
 		});
 	} catch (error) {
 		console.error("Error approving application:", error);
@@ -352,16 +506,113 @@ export const bulkApplicationAction = async (req, res) => {
 					const userToUpdate = await User.findById(application.applicantId);
 					if (userToUpdate) {
 						let newRole = userToUpdate.role;
+						let createdRecord = null;
 
 						if (application.applicationType === "seller-application") {
+							// Create Seller record
+							const sellerData = {
+								userId: application.applicantId,
+								name: application.applicantName,
+								email: application.applicantEmail,
+								phoneNumber: userToUpdate.phoneNumber || "",
+								profilePicture: application.applicantImg,
+								address: userToUpdate.address || {},
+								fullAddress: userToUpdate.fullAddress || "",
+								applicationId: application._id,
+								operationalArea: application.operationalArea,
+								formData: application.formData,
+								businessName:
+									application.formData.businessName || "Unknown Business",
+								businessType: application.formData.businessType || "farm",
+								businessLicense: application.formData.businessLicense || {},
+								farmDetails: application.formData.farmDetails || {},
+								bankDetails: application.formData.bankDetails || {},
+								taxInfo: application.formData.taxInfo || {},
+								approvedBy: adminId,
+								approvedAt: new Date(),
+								approvalNotes: reason,
+							};
+
+							const newSeller = new Seller(sellerData);
+							createdRecord = await newSeller.save();
 							newRole = "seller";
-						} else if (application.applicationType === "agent-application") {
-							newRole = "agent";
+
+							// Update user operational area
 							userToUpdate.operationalArea = {
 								region: application.operationalArea.region,
 								district: application.operationalArea.district,
 							};
+						} else if (application.applicationType === "agent-application") {
+							// Generate unique agent ID
+							const agentCount = await Agent.countDocuments();
+							const agentId = `AGT-${Date.now()}-${String(
+								agentCount + 1
+							).padStart(4, "0")}`;
+
+							// Create Agent record
+							const agentData = {
+								userId: application.applicantId,
+								name: application.applicantName,
+								email: application.applicantEmail,
+								phoneNumber: userToUpdate.phoneNumber || "",
+								profilePicture: application.applicantImg,
+								address: userToUpdate.address || {},
+								fullAddress: userToUpdate.fullAddress || "",
+								applicationId: application._id,
+								operationalArea: application.operationalArea,
+								formData: application.formData,
+								agentId: agentId,
+								specialization: application.formData.specialization || [
+									"crops",
+								],
+								qualifications: application.formData.qualifications || {},
+								languagesSpoken: application.formData.languagesSpoken || [],
+								availability: application.formData.availability || {},
+								approvedBy: adminId,
+								approvedAt: new Date(),
+								approvalNotes: reason,
+							};
+
+							const newAgent = new Agent(agentData);
+							createdRecord = await newAgent.save();
+							newRole = "agent";
+
+							// Update user operational area and set verified
+							userToUpdate.operationalArea = {
+								region: application.operationalArea.region,
+								district: application.operationalArea.district,
+							};
+							userToUpdate.verified = true;
 						} else if (application.applicationType === "admin-application") {
+							// Generate unique admin ID
+							const adminCount = await Admin.countDocuments();
+							const adminId = `ADM-${Date.now()}-${String(
+								adminCount + 1
+							).padStart(4, "0")}`;
+
+							// Create Admin record
+							const adminData = {
+								userId: application.applicantId,
+								name: application.applicantName,
+								email: application.applicantEmail,
+								phoneNumber: userToUpdate.phoneNumber || "",
+								profilePicture: application.applicantImg,
+								address: userToUpdate.address || {},
+								fullAddress: userToUpdate.fullAddress || "",
+								applicationId: application._id,
+								operationalArea: application.operationalArea,
+								formData: application.formData,
+								adminId: adminId,
+								department: application.formData.department || "operations",
+								qualifications: application.formData.qualifications || {},
+								permissions: application.formData.permissions || {},
+								approvedBy: adminId,
+								approvedAt: new Date(),
+								approvalNotes: reason,
+							};
+
+							const newAdmin = new Admin(adminData);
+							createdRecord = await newAdmin.save();
 							newRole = "admin";
 						}
 
@@ -576,6 +827,238 @@ export const addApplicationNote = async (req, res) => {
 		res.status(500).json({
 			success: false,
 			message: "Server error while adding note.",
+			error: error.message,
+		});
+	}
+};
+
+// AGENT-SPECIFIC ENDPOINTS
+
+// 1. Agent-Specific Application Filtering
+export const getAgentApplications = async (req, res) => {
+	try {
+		const agentId = req.decoded.id;
+		const {
+			status,
+			search,
+			page = 1,
+			limit = 10,
+			sortBy = "createdAt",
+			sortOrder = "desc",
+		} = req.query;
+
+		// Get agent's operational area from user profile
+		const agent = await User.findById(agentId);
+		if (!agent || agent.role !== "agent") {
+			return res.status(403).json({
+				success: false,
+				message: "Access denied. Only agents can use this endpoint.",
+			});
+		}
+
+		if (
+			!agent.operationalArea ||
+			!agent.operationalArea.region ||
+			!agent.operationalArea.district
+		) {
+			return res.status(400).json({
+				success: false,
+				message: "Agent's operational area is not properly configured.",
+			});
+		}
+
+		// Build query for seller applications in agent's operational area
+		const query = {
+			applicationType: "seller-application",
+			"operationalArea.region": agent.operationalArea.region,
+			"operationalArea.district": agent.operationalArea.district,
+		};
+
+		// Filter by status if specified
+		if (status && status !== "all") {
+			query.status = status;
+		}
+
+		// Search by applicant name or email if specified
+		if (search && search.trim()) {
+			query.$or = [
+				{ applicantName: { $regex: search.trim(), $options: "i" } },
+				{ applicantEmail: { $regex: search.trim(), $options: "i" } },
+			];
+		}
+
+		// Calculate pagination
+		const pageNumber = parseInt(page);
+		const pageSize = parseInt(limit);
+		const skip = (pageNumber - 1) * pageSize;
+
+		// Sort options
+		const sortOptions = {};
+		sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
+
+		// Execute query with pagination
+		const applications = await Application.find(query)
+			.sort(sortOptions)
+			.skip(skip)
+			.limit(pageSize)
+			.exec();
+
+		// Get total count for pagination
+		const totalApplications = await Application.countDocuments(query);
+		const totalPages = Math.ceil(totalApplications / pageSize);
+
+		res.json({
+			success: true,
+			applications,
+			totalApplications,
+			totalPages,
+			currentPage: pageNumber,
+			pageSize,
+			agentOperationalArea: {
+				region: agent.operationalArea.region,
+				district: agent.operationalArea.district,
+			},
+		});
+	} catch (error) {
+		console.error("Error fetching agent applications:", error);
+		res.status(500).json({
+			success: false,
+			message: "Server error while fetching agent applications.",
+			error: error.message,
+		});
+	}
+};
+
+// 2. Agent Role Assignment Check
+export const getAgentOperationalArea = async (req, res) => {
+	try {
+		const agentId = req.decoded.id;
+
+		// Get agent's profile
+		const agent = await User.findById(agentId).select(
+			"name email role operationalArea verified"
+		);
+
+		if (!agent || agent.role !== "agent") {
+			return res.status(403).json({
+				success: false,
+				message: "Access denied. Only agents can use this endpoint.",
+			});
+		}
+
+		// Check if operational area is properly configured
+		const hasOperationalArea =
+			agent.operationalArea &&
+			agent.operationalArea.region &&
+			agent.operationalArea.district;
+
+		res.json({
+			success: true,
+			message: "Agent operational area retrieved successfully.",
+			agent: {
+				id: agent._id,
+				name: agent.name,
+				email: agent.email,
+				role: agent.role,
+				verified: agent.verified,
+				operationalArea: agent.operationalArea || null,
+				hasValidOperationalArea: hasOperationalArea,
+			},
+		});
+	} catch (error) {
+		console.error("Error fetching agent operational area:", error);
+		res.status(500).json({
+			success: false,
+			message: "Server error while fetching agent operational area.",
+			error: error.message,
+		});
+	}
+};
+
+// 3. Enhanced Agent Statistics
+export const getAgentApplicationStatistics = async (req, res) => {
+	try {
+		const agentId = req.decoded.id;
+
+		// Get agent's operational area
+		const agent = await User.findById(agentId);
+		if (!agent || agent.role !== "agent") {
+			return res.status(403).json({
+				success: false,
+				message: "Access denied. Only agents can use this endpoint.",
+			});
+		}
+
+		if (
+			!agent.operationalArea ||
+			!agent.operationalArea.region ||
+			!agent.operationalArea.district
+		) {
+			return res.status(400).json({
+				success: false,
+				message: "Agent's operational area is not properly configured.",
+			});
+		}
+
+		// Base query for agent's operational area
+		const baseQuery = {
+			applicationType: "seller-application",
+			"operationalArea.region": agent.operationalArea.region,
+			"operationalArea.district": agent.operationalArea.district,
+		};
+
+		// Get counts by status
+		const [total, pending, approved, rejected, inReview] = await Promise.all([
+			Application.countDocuments(baseQuery),
+			Application.countDocuments({ ...baseQuery, status: "pending" }),
+			Application.countDocuments({ ...baseQuery, status: "approved" }),
+			Application.countDocuments({ ...baseQuery, status: "rejected" }),
+			Application.countDocuments({ ...baseQuery, status: "in-review" }),
+		]);
+
+		// Get applications by date (last 30 days)
+		const thirtyDaysAgo = new Date();
+		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+		const recentApplications = await Application.aggregate([
+			{
+				$match: {
+					...baseQuery,
+					createdAt: { $gte: thirtyDaysAgo },
+				},
+			},
+			{
+				$group: {
+					_id: {
+						$dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+					},
+					count: { $sum: 1 },
+				},
+			},
+			{ $sort: { _id: 1 } },
+		]);
+
+		res.json({
+			success: true,
+			message: "Agent application statistics retrieved successfully",
+			operationalArea: {
+				region: agent.operationalArea.region,
+				district: agent.operationalArea.district,
+			},
+			statistics: {
+				total,
+				pending,
+				approved,
+				rejected,
+				inReview,
+				recentTrend: recentApplications,
+			},
+		});
+	} catch (error) {
+		console.error("Error fetching agent application statistics:", error);
+		res.status(500).json({
+			success: false,
+			message: "Server error while fetching agent statistics.",
 			error: error.message,
 		});
 	}
