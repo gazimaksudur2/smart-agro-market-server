@@ -9,10 +9,14 @@ import {
 	approveProduct,
 	deleteProduct,
 	// Agent routes
-	getAgentPendingProducts,
-	getAgentProductStatistics,
-	rejectProduct,
-	getAgentOperationalAreaProducts,
+	getAgentRegionalProducts,
+	getAgentStatistics,
+	getAgentOperationalArea,
+	agentApproveProduct,
+	agentRejectProduct,
+	agentSuspendProduct,
+	getAgentProductDetails,
+	getAgentReviewHistory,
 	// Admin routes
 	getAdminAllProducts,
 	getAdminProductStatistics,
@@ -47,23 +51,26 @@ router.get("/crop-types", getCropTypes);
 // AGENT ROUTES
 // ============================
 
-// GET /products/agent/pending - Get products pending approval in agent's region
-router.get("/agent/pending", verifyJWT, agentOnly, getAgentPendingProducts);
+// 1. GET /products/agent/regional - Get regional products
+router.get("/agent/regional", verifyJWT, agentOnly, getAgentRegionalProducts);
 
-// GET /products/agent/statistics - Get agent's product statistics
-router.get(
-	"/agent/statistics",
-	verifyJWT,
-	agentOnly,
-	getAgentProductStatistics
-);
+// 2. GET /products/agent/statistics - Get agent statistics
+router.get("/agent/statistics", verifyJWT, agentOnly, getAgentStatistics);
 
-// GET /products/agent/operational-area - Get agent's operational area products
+// 3. GET /products/agent/operational-area - Get operational area info
 router.get(
 	"/agent/operational-area",
 	verifyJWT,
 	agentOnly,
-	getAgentOperationalAreaProducts
+	getAgentOperationalArea
+);
+
+// 8. GET /products/agent/review-history - Get agent review history
+router.get(
+	"/agent/review-history",
+	verifyJWT,
+	agentOnly,
+	getAgentReviewHistory
 );
 
 // ============================
@@ -94,11 +101,17 @@ router.get("/seller/:email", verifyJWT, verifyUserEmail, getProductsBySeller);
 // POST /products/add-product – seller adds product (agentVerified required)
 router.post("/add-product", verifyJWT, verifyRole(["seller"]), addProduct);
 
-// PATCH /products/approve/:id – agent approves product
+// LEGACY: PATCH /products/approve/:id – agent approves product (keep for compatibility)
 router.patch("/approve/:id", verifyJWT, agentOnly, approveProduct);
 
-// PATCH /products/reject/:id - Reject product (Agent only)
-router.patch("/reject/:id", verifyJWT, agentOnly, rejectProduct);
+// 4. PATCH /products/:productId/approve - Approve product (Agent)
+router.patch("/:productId/approve", verifyJWT, agentOnly, agentApproveProduct);
+
+// 5. PATCH /products/:productId/reject - Reject product (Agent)
+router.patch("/:productId/reject", verifyJWT, agentOnly, agentRejectProduct);
+
+// 6. PATCH /products/:productId/suspend - Suspend product (Agent)
+router.patch("/:productId/suspend", verifyJWT, agentOnly, agentSuspendProduct);
 
 // PATCH /products/admin/approve/:id - Admin approve product
 router.patch("/admin/approve/:id", verifyJWT, adminOnly, adminApproveProduct);
@@ -116,7 +129,7 @@ router.delete("/:id", verifyJWT, deleteProduct);
 // DYNAMIC ROUTES (Must be last)
 // ============================
 
-// GET /products/:id – product details (keep this after all specific routes)
-router.get("/:id", getProductById);
+// 7. GET /products/:productId - Enhanced product details (available to all)
+router.get("/:productId", getAgentProductDetails);
 
 export default router;

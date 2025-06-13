@@ -57,21 +57,92 @@ const productSchema = new mongoose.Schema(
 		sellerInfo: {
 			_id: { type: String, required: true },
 			name: { type: String, required: true },
+			farmName: { type: String, default: "" },
 			email: { type: String, required: true },
 			phone: { type: String, required: true },
+			verificationStatus: { type: String, default: "verified" },
+			rating: { type: Number, default: 0, min: 0, max: 5 },
+			totalProducts: { type: Number, default: 0 },
 			operationalArea: {
 				region: { type: String, required: true },
 				district: { type: String, required: true },
+				upazila: { type: String, default: "" },
+				address: { type: String, default: "" },
+				coordinates: {
+					lat: { type: Number, default: 0 },
+					lng: { type: Number, default: 0 },
+				},
 			},
 		},
 		status: {
 			type: String,
-			enum: ["pending", "approved", "rejected", "suspended", "sold_out"],
+			enum: [
+				"pending",
+				"approved",
+				"rejected",
+				"suspended",
+				"sold_out",
+				"live",
+			],
 			default: "pending",
 		},
 		statusReason: {
 			type: String,
 			default: "",
+		},
+		// Enhanced tracking for agent operations
+		approvalReason: {
+			type: String,
+			default: "",
+		},
+		rejectedAt: {
+			type: Date,
+		},
+		rejectedBy: {
+			type: String,
+			ref: "User",
+		},
+		rejectionReason: {
+			type: String,
+			default: "",
+		},
+		suspendedAt: {
+			type: Date,
+		},
+		suspendedBy: {
+			type: String,
+			ref: "User",
+		},
+		suspensionReason: {
+			type: String,
+			default: "",
+		},
+		qualityScore: {
+			type: Number,
+			default: 0,
+			min: 0,
+			max: 100,
+		},
+		// Product specifications
+		specifications: {
+			variety: { type: String, default: "" },
+			grade: { type: String, default: "" },
+			harvestDate: { type: Date },
+			processingMethod: { type: String, default: "" },
+		},
+		// Timeline tracking
+		timeline: {
+			submittedAt: {
+				type: Date,
+				default: Date.now,
+			},
+			lastUpdated: {
+				type: Date,
+				default: Date.now,
+			},
+			reviewDeadline: {
+				type: Date,
+			},
 		},
 		quality: {
 			type: String,
@@ -140,11 +211,17 @@ const productSchema = new mongoose.Schema(
 
 // Useful indexes
 productSchema.index({ cropType: 1 });
-productSchema.index({ "sellerInfo.region": 1 });
-productSchema.index({ "sellerInfo.district": 1 });
+productSchema.index({ "sellerInfo.operationalArea.region": 1 });
+productSchema.index({ "sellerInfo.operationalArea.district": 1 });
+productSchema.index({ "sellerInfo.operationalArea.upazila": 1 });
 productSchema.index({ status: 1 });
 productSchema.index({ pricePerUnit: 1 });
+productSchema.index({ qualityScore: 1 });
 productSchema.index({ "adminHistory.timestamp": -1 });
 productSchema.index({ lastModified: -1 });
+productSchema.index({ "timeline.submittedAt": -1 });
+productSchema.index({ "timeline.reviewDeadline": 1 });
+productSchema.index({ rejectedAt: -1 });
+productSchema.index({ suspendedAt: -1 });
 
 export default mongoose.model("Product", productSchema);
