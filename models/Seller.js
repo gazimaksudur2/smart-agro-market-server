@@ -49,30 +49,91 @@ const sellerSchema = new mongoose.Schema(
 			required: true,
 		},
 
-		// Essential business information
-		businessName: {
+		// Farm information - extracted from formData for easier querying
+		farmName: {
 			type: String,
 			required: true,
 			trim: true,
 		},
-		businessType: {
+		farmType: {
 			type: String,
-			enum: ["farm", "cooperative", "distributor", "retailer"],
+			enum: [
+				"Crop Farming",
+				"Vegetable Farming",
+				"Fruit Farming",
+				"Dairy Farming",
+				"Poultry Farming",
+				"Fish Farming",
+				"Livestock Farming",
+				"Organic Farming",
+				"Mixed Farming",
+				"Other",
+			],
+			required: true,
+		},
+		farmSize: {
+			type: String,
+			required: true,
+		},
+		experience: {
+			type: String,
+			required: true,
+		},
+		farmAddress: {
+			type: String,
+			required: true,
+		},
+		specialization: {
+			type: String,
+			required: true,
+		},
+		certifications: {
+			type: String,
+			default: "",
+		},
+		nidNumber: {
+			type: String,
+			required: true,
+		},
+		nidCopy: {
+			type: String, // URL
+			default: "",
+		},
+		farmPhotos: {
+			type: [String], // Array of URLs
+			default: [],
+		},
+
+		// Location details
+		region: {
+			type: String,
+			required: true,
+		},
+		district: {
+			type: String,
+			required: true,
+		},
+		upazila: {
+			type: String,
+			required: true,
+		},
+		village: {
+			type: String,
 			required: true,
 		},
 
-		// Simplified farm details
-		farmDetails: {
-			farmSize: Number, // in acres
-			cropTypes: [String],
-			organicCertified: { type: Boolean, default: false },
+		// Financial and reference information
+		bankAccountDetails: {
+			type: String,
+			default: "",
 		},
-
-		// Basic bank details for payments
-		bankDetails: {
-			accountHolderName: String,
-			bankName: String,
-			accountNumber: String,
+		references: {
+			type: String,
+			default: "",
+		},
+		motivation: {
+			type: String,
+			required: true,
 		},
 
 		// Status and verification
@@ -113,13 +174,15 @@ const sellerSchema = new mongoose.Schema(
 	{ timestamps: true }
 );
 
-// Essential indexes only
+// Essential indexes
 sellerSchema.index({ userId: 1 });
 sellerSchema.index({ email: 1 });
 sellerSchema.index({ isActive: 1 });
 sellerSchema.index({ verified: 1 });
 sellerSchema.index({ "operationalArea.region": 1 });
 sellerSchema.index({ "operationalArea.district": 1 });
+sellerSchema.index({ farmType: 1 });
+sellerSchema.index({ region: 1, district: 1 });
 
 // Pre-save middleware to ensure userId is a string
 sellerSchema.pre("save", function (next) {

@@ -55,23 +55,73 @@ const agentSchema = new mongoose.Schema(
 			unique: true,
 			required: true, // Auto-generated agent ID
 		},
-		specialization: {
-			type: [String],
+
+		// Business information - extracted from formData for easier querying
+		businessName: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		businessType: {
+			type: String,
 			enum: [
-				"crops",
-				"livestock",
-				"aquaculture",
-				"forestry",
-				"organic",
-				"technology",
+				"Agricultural Trading",
+				"Wholesale Distribution",
+				"Logistics & Transportation",
+				"Cold Storage",
+				"Food Processing",
+				"Import/Export",
+				"Other",
 			],
 			required: true,
 		},
-
-		// Simplified qualifications
 		experience: {
-			totalYears: { type: Number, required: true },
-			description: String, // Brief description of experience
+			type: String,
+			required: true,
+		},
+		warehouseAddress: {
+			type: String,
+			required: true,
+		},
+		warehouseSize: {
+			type: String,
+			required: true,
+		},
+		coverageAreas: {
+			type: String,
+			required: true,
+		},
+		businessLicense: {
+			type: String, // URL
+			default: "",
+		},
+		warehouseImages: {
+			type: [String], // Array of URLs
+			default: [],
+		},
+
+		// Location details
+		region: {
+			type: String,
+			required: true,
+		},
+		district: {
+			type: String,
+			required: true,
+		},
+
+		// Financial and reference information
+		bankAccountDetails: {
+			type: String,
+			default: "",
+		},
+		references: {
+			type: String,
+			default: "",
+		},
+		motivation: {
+			type: String,
+			required: true,
 		},
 
 		// Status and verification
@@ -131,7 +181,7 @@ const agentSchema = new mongoose.Schema(
 	{ timestamps: true }
 );
 
-// Essential indexes only
+// Essential indexes
 agentSchema.index({ userId: 1 });
 agentSchema.index({ agentId: 1 });
 agentSchema.index({ email: 1 });
@@ -139,7 +189,8 @@ agentSchema.index({ isActive: 1 });
 agentSchema.index({ verified: 1 });
 agentSchema.index({ "operationalArea.region": 1 });
 agentSchema.index({ "operationalArea.district": 1 });
-agentSchema.index({ specialization: 1 });
+agentSchema.index({ businessType: 1 });
+agentSchema.index({ region: 1, district: 1 });
 
 // Pre-save middleware to ensure userId is a string
 agentSchema.pre("save", function (next) {

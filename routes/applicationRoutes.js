@@ -13,6 +13,8 @@ import {
 	getAgentApplications,
 	getAgentOperationalArea,
 	getAgentApplicationStatistics,
+	getUserApplicationStatus,
+	getUserApplications,
 } from "../controllers/applicationController.js";
 import { verifyJWT, verifyRole } from "../middleware/auth.js"; // Assuming verifyRole is your admin/role check middleware
 
@@ -22,11 +24,14 @@ const router = express.Router();
 const adminOnly = verifyRole(["admin"]);
 const adminOrAgentRoles = verifyRole(["admin", "agent"]);
 const agentOnly = verifyRole(["agent"]);
-const adminOrReviewerRoles = ["admin", "reviewer"];
 
 // Public/User Routes
 router.post("/", verifyJWT, submitApplication);
 router.get("/my-applications", verifyJWT, getMyApplications);
+
+// User-specific routes
+router.get("/user/status", verifyJWT, getUserApplicationStatus);
+router.get("/user/:userId", verifyJWT, getUserApplications);
 
 // Agent-Specific Routes (specific routes first)
 router.get("/agent/applications", verifyJWT, agentOnly, getAgentApplications);
@@ -53,23 +58,18 @@ router.get(
 router.get("/statistics", verifyJWT, adminOnly, getApplicationStatistics);
 router.patch("/bulk-action", verifyJWT, adminOnly, bulkApplicationAction);
 
-// HIGH PRIORITY: Action endpoints (with exact patterns)
-router.patch("/:id/approve", verifyJWT, adminOnly, approveApplication);
-router.patch("/:id/reject", verifyJWT, adminOnly, rejectApplication);
+// Primary action endpoints - professional and direct
+router.patch("/:id/approve", verifyJWT, adminOrAgentRoles, approveApplication);
+router.patch("/:id/reject", verifyJWT, adminOrAgentRoles, rejectApplication);
 
 // Legacy endpoints (keep for backward compatibility)
 router.put(
 	"/:id/status",
 	verifyJWT,
-	verifyRole(adminOrReviewerRoles),
+	adminOrAgentRoles,
 	updateApplicationStatus
 );
-router.post(
-	"/:id/notes",
-	verifyJWT,
-	verifyRole(adminOrReviewerRoles),
-	addApplicationNote
-);
+router.post("/:id/notes", verifyJWT, adminOrAgentRoles, addApplicationNote);
 
 // Dynamic routes last
 router.get("/:id", verifyJWT, getApplicationById);
