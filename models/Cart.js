@@ -49,6 +49,9 @@ const cartSchema = new mongoose.Schema(
 					sellerId: String,
 					name: String,
 				},
+				category: {
+					type: String,
+				},
 				addedAt: {
 					type: Date,
 					default: Date.now,

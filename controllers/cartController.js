@@ -15,6 +15,7 @@ const formatCartResponse = (cart) => ({
 			sellerId: item.seller.sellerId,
 			name: item.seller.name,
 		},
+		category: item.category,
 	})),
 	totalItems: cart.totalItems,
 	subtotal: cart.subtotal,
@@ -27,7 +28,85 @@ const verifyUserAccess = (req, email) => {
 	return req.decoded.email === email || req.decoded.role === "admin";
 };
 
-// 1. GET /api/cart/:email - Load User Cart
+// Helper function to validate item data
+const validateItemData = (item) => {
+	const errors = [];
+
+	if (!item._id) errors.push("Product ID is required");
+	if (!item.title) errors.push("Product title is required");
+	if (!item.price || item.price <= 0)
+		errors.push("Valid price is required (must be > 0)");
+	if (!item.unit) errors.push("Product unit is required");
+	if (!item.quantity || item.quantity <= 0)
+		errors.push("Valid quantity is required (must be > 0)");
+	if (item.minimumOrderQuantity && item.quantity < item.minimumOrderQuantity) {
+		errors.push(
+			`Quantity must be at least ${item.minimumOrderQuantity} (minimum order quantity)`
+		);
+	}
+
+	return errors;
+};
+
+// Helper function to validate operation
+const validateOperation = (operation, cart) => {
+	const errors = [];
+	const { type, productId, quantity, item } = operation;
+
+	if (!type) {
+		errors.push("Operation type is required");
+		return errors;
+	}
+
+	if (type === "update") {
+		if (!productId) errors.push("Product ID is required for update operation");
+		if (!quantity || quantity <= 0)
+			errors.push(
+				"Valid quantity is required for update operation (must be > 0)"
+			);
+
+		// Check if item exists in cart
+		const cartItem = cart.items.find(
+			(cartItem) => cartItem.productId === productId
+		);
+		if (!cartItem) {
+			errors.push(
+				`Product ${productId} not found in cart for update operation`
+			);
+		} else if (quantity < cartItem.minimumOrderQuantity) {
+			errors.push(
+				`Quantity must be at least ${cartItem.minimumOrderQuantity} for product ${productId}`
+			);
+		}
+	} else if (type === "remove") {
+		if (!productId) errors.push("Product ID is required for remove operation");
+
+		// Check if item exists in cart
+		const cartItem = cart.items.find(
+			(cartItem) => cartItem.productId === productId
+		);
+		if (!cartItem) {
+			errors.push(
+				`Product ${productId} not found in cart for remove operation`
+			);
+		}
+	} else if (type === "add") {
+		if (!item) {
+			errors.push("Item data is required for add operation");
+		} else {
+			const itemErrors = validateItemData(item);
+			errors.push(...itemErrors.map((err) => `Add operation: ${err}`));
+		}
+	} else {
+		errors.push(
+			`Invalid operation type: ${type}. Supported types are: update, remove, add`
+		);
+	}
+
+	return errors;
+};
+
+// 1. GET /api/cart/:email - Get User Cart
 export const getUserCart = async (req, res) => {
 	try {
 		const { email } = req.params;
@@ -70,10 +149,21 @@ export const getUserCart = async (req, res) => {
 	}
 };
 
-// 2. POST /api/cart/add - Add Single Item to Cart
+// 2. POST /api/cart/add - Add Single Item
 export const addSingleItem = async (req, res) => {
 	try {
-		const { email, productId, quantity = 1 } = req.body;
+		const {
+			email,
+			_id,
+			title,
+			price,
+			quantity = 1,
+			unit,
+			image,
+			minimumOrderQuantity = 1,
+			category,
+			seller,
+		} = req.body;
 
 		// Verify user access
 		if (!verifyUserAccess(req, email)) {
@@ -84,40 +174,22 @@ export const addSingleItem = async (req, res) => {
 			});
 		}
 
-		// Validate required fields
-		if (!email || !productId) {
+		// Validate item data
+		const itemData = {
+			_id,
+			title,
+			price,
+			quantity,
+			unit,
+			minimumOrderQuantity,
+		};
+		const validationErrors = validateItemData(itemData);
+
+		if (validationErrors.length > 0) {
 			return res.status(400).json({
 				success: false,
-				message: "Bad request/Invalid data",
-				error: "Email and productId are required",
-			});
-		}
-
-		// Get product details
-		const product = await Product.findById(productId);
-		if (!product) {
-			return res.status(404).json({
-				success: false,
-				message: "Cart/Item not found",
-				error: "Product not found",
-			});
-		}
-
-		// Check if product is approved
-		if (product.status !== "approved") {
-			return res.status(400).json({
-				success: false,
-				message: "Bad request/Invalid data",
-				error: "Product is not available for purchase",
-			});
-		}
-
-		// Validate quantity
-		if (quantity < product.minimumOrderQuantity) {
-			return res.status(400).json({
-				success: false,
-				message: "Bad request/Invalid data",
-				error: `Minimum order quantity is ${product.minimumOrderQuantity}`,
+				message: "Validation failed",
+				error: validationErrors.join(", "),
 			});
 		}
 
@@ -129,32 +201,44 @@ export const addSingleItem = async (req, res) => {
 				userEmail: email,
 				userId: req.decoded.id,
 				items: [],
-				deliveryCharge: 300, // Default delivery charge
+				deliveryCharge: 0,
 			});
 		}
 
-		// Check if item already exists in cart
+		// Check if item already exists in cart (merge logic)
 		const existingItemIndex = cart.items.findIndex(
-			(item) => item.productId === productId
+			(item) => item.productId === _id
 		);
 
 		if (existingItemIndex !== -1) {
-			// Update existing item quantity (merge)
-			cart.items[existingItemIndex].quantity += quantity;
+			// Merge: Add quantities together
+			const newQuantity = cart.items[existingItemIndex].quantity + quantity;
+
+			// Validate merged quantity against minimum order quantity
+			if (newQuantity < cart.items[existingItemIndex].minimumOrderQuantity) {
+				return res.status(400).json({
+					success: false,
+					message: "Validation failed",
+					error: `Total quantity (${newQuantity}) must be at least ${cart.items[existingItemIndex].minimumOrderQuantity}`,
+				});
+			}
+
+			cart.items[existingItemIndex].quantity = newQuantity;
 		} else {
-			// Add new item to cart
+			// Add as new item
 			const newItem = {
-				productId: product._id.toString(),
-				title: product.title,
-				price: product.pricePerUnit,
-				unit: product.unit,
+				productId: _id,
+				title: title,
+				price: price,
+				unit: unit,
 				quantity: quantity,
-				minimumOrderQuantity: product.minimumOrderQuantity,
-				image: product.images?.[0] || "",
+				minimumOrderQuantity: minimumOrderQuantity,
+				image: image || "",
 				seller: {
-					sellerId: product.sellerInfo._id.toString(),
-					name: product.sellerInfo.name,
+					sellerId: seller?.sellerId || "",
+					name: seller?.name || "",
 				},
+				category: category || "",
 				addedAt: new Date(),
 			};
 			cart.items.push(newItem);
@@ -164,7 +248,7 @@ export const addSingleItem = async (req, res) => {
 
 		res.status(200).json({
 			success: true,
-			message: "Item added to cart",
+			message: "Item added to cart successfully",
 			cart: formatCartResponse(cart),
 		});
 	} catch (error) {
@@ -176,7 +260,7 @@ export const addSingleItem = async (req, res) => {
 	}
 };
 
-// 3. POST /api/cart/add-multiple - Add Multiple Items to Cart
+// 3. POST /api/cart/add-multiple - Add Multiple Items
 export const addMultipleItems = async (req, res) => {
 	try {
 		const { email, items } = req.body;
@@ -199,6 +283,23 @@ export const addMultipleItems = async (req, res) => {
 			});
 		}
 
+		// Validate all items before processing (fail fast approach)
+		const allValidationErrors = [];
+		items.forEach((item, index) => {
+			const errors = validateItemData(item);
+			if (errors.length > 0) {
+				allValidationErrors.push(`Item ${index + 1}: ${errors.join(", ")}`);
+			}
+		});
+
+		if (allValidationErrors.length > 0) {
+			return res.status(400).json({
+				success: false,
+				message: "Validation failed for multiple items",
+				error: allValidationErrors.join("; "),
+			});
+		}
+
 		// Find or create cart
 		let cart = await Cart.findOne({ userEmail: email });
 
@@ -207,53 +308,55 @@ export const addMultipleItems = async (req, res) => {
 				userEmail: email,
 				userId: req.decoded.id,
 				items: [],
-				deliveryCharge: 300, // Default delivery charge
+				deliveryCharge: 0,
 			});
 		}
 
-		let addedItems = 0;
-		let mergedItems = 0;
+		// Process each item with merge logic
+		let mergedCount = 0;
+		let addedCount = 0;
 
-		// Process each item
 		for (const item of items) {
 			const {
-				productId,
-				quantity,
+				_id,
 				title,
 				price,
+				quantity,
 				unit,
 				image,
-				minimumOrderQuantity,
+				category,
 				seller,
+				minimumOrderQuantity = 1,
 			} = item;
 
-			// Check if item already exists in cart
+			// Check if item already exists in cart (merge logic)
 			const existingItemIndex = cart.items.findIndex(
-				(cartItem) => cartItem.productId === productId
+				(cartItem) => cartItem.productId === _id
 			);
 
 			if (existingItemIndex !== -1) {
-				// Update existing item quantity (merge)
+				// Merge: Add quantities together
 				cart.items[existingItemIndex].quantity += quantity;
-				mergedItems++;
+				mergedCount++;
 			} else {
-				// Add new item to cart
+				// Add as new item
 				const newItem = {
-					productId: productId,
+					productId: _id,
 					title: title,
 					price: price,
 					unit: unit,
 					quantity: quantity,
-					minimumOrderQuantity: minimumOrderQuantity || 1,
+					minimumOrderQuantity: minimumOrderQuantity,
 					image: image || "",
 					seller: {
 						sellerId: seller?.sellerId || "",
 						name: seller?.name || "",
 					},
+					category: category || "",
 					addedAt: new Date(),
 				};
 				cart.items.push(newItem);
-				addedItems++;
+				addedCount++;
 			}
 		}
 
@@ -261,10 +364,8 @@ export const addMultipleItems = async (req, res) => {
 
 		res.status(200).json({
 			success: true,
-			message: "Items added to cart",
+			message: `Items added to cart successfully (${addedCount} new, ${mergedCount} merged)`,
 			cart: formatCartResponse(cart),
-			addedItems,
-			mergedItems,
 		});
 	} catch (error) {
 		res.status(500).json({
@@ -299,11 +400,11 @@ export const updateCartItem = async (req, res) => {
 		}
 
 		// Validate quantity
-		if (quantity < 1) {
+		if (quantity <= 0) {
 			return res.status(400).json({
 				success: false,
-				message: "Bad request/Invalid data",
-				error: "Quantity must be at least 1",
+				message: "Validation failed",
+				error: "Quantity must be greater than 0",
 			});
 		}
 
@@ -312,8 +413,8 @@ export const updateCartItem = async (req, res) => {
 		if (!cart) {
 			return res.status(404).json({
 				success: false,
-				message: "Cart/Item not found",
-				error: "Cart not found",
+				message: "Cart not found",
+				error: "Cart not found for this user",
 			});
 		}
 
@@ -325,18 +426,18 @@ export const updateCartItem = async (req, res) => {
 		if (itemIndex === -1) {
 			return res.status(404).json({
 				success: false,
-				message: "Cart/Item not found",
-				error: "Item not found in cart",
+				message: "Item not found",
+				error: `Product ${productId} not found in cart`,
 			});
 		}
 
-		// Verify minimum order quantity
+		// Verify minimum order quantity (business rule)
 		const item = cart.items[itemIndex];
 		if (quantity < item.minimumOrderQuantity) {
 			return res.status(400).json({
 				success: false,
-				message: "Bad request/Invalid data",
-				error: `Minimum order quantity is ${item.minimumOrderQuantity}`,
+				message: "Validation failed",
+				error: `Quantity must be at least ${item.minimumOrderQuantity} (minimum order quantity for ${item.title})`,
 			});
 		}
 
@@ -346,7 +447,7 @@ export const updateCartItem = async (req, res) => {
 
 		res.status(200).json({
 			success: true,
-			message: "Cart updated",
+			message: "Cart updated successfully",
 			cart: formatCartResponse(cart),
 		});
 	} catch (error) {
@@ -358,7 +459,7 @@ export const updateCartItem = async (req, res) => {
 	}
 };
 
-// 5. DELETE /api/cart/remove - Remove Item from Cart
+// 5. DELETE /api/cart/remove - Remove Single Item
 export const removeCartItem = async (req, res) => {
 	try {
 		const { email, productId } = req.body;
@@ -386,8 +487,8 @@ export const removeCartItem = async (req, res) => {
 		if (!cart) {
 			return res.status(404).json({
 				success: false,
-				message: "Cart/Item not found",
-				error: "Cart not found",
+				message: "Cart not found",
+				error: "Cart not found for this user",
 			});
 		}
 
@@ -399,17 +500,18 @@ export const removeCartItem = async (req, res) => {
 		if (itemIndex === -1) {
 			return res.status(404).json({
 				success: false,
-				message: "Cart/Item not found",
-				error: "Item not found in cart",
+				message: "Item not found",
+				error: `Product ${productId} not found in cart`,
 			});
 		}
 
+		const removedItem = cart.items[itemIndex];
 		cart.items.splice(itemIndex, 1);
 		await cart.save();
 
 		res.status(200).json({
 			success: true,
-			message: "Item removed from cart",
+			message: `Item "${removedItem.title}" removed from cart`,
 			cart: formatCartResponse(cart),
 		});
 	} catch (error) {
@@ -440,10 +542,12 @@ export const clearCart = async (req, res) => {
 		if (!cart) {
 			return res.status(404).json({
 				success: false,
-				message: "Cart/Item not found",
-				error: "Cart not found",
+				message: "Cart not found",
+				error: "Cart not found for this user",
 			});
 		}
+
+		const itemCount = cart.items.length;
 
 		// Clear all items
 		cart.items = [];
@@ -452,7 +556,7 @@ export const clearCart = async (req, res) => {
 
 		res.status(200).json({
 			success: true,
-			message: "Cart cleared",
+			message: `Cart cleared successfully (${itemCount} items removed)`,
 			cart: formatCartResponse(cart),
 		});
 	} catch (error) {
@@ -464,7 +568,7 @@ export const clearCart = async (req, res) => {
 	}
 };
 
-// 7. POST /api/cart/batch-update - Batch Update Cart Items
+// 7. POST /api/cart/batch-update - Batch Update Multiple Items (Atomic Processing)
 export const batchUpdateCart = async (req, res) => {
 	try {
 		const { email, operations } = req.body;
@@ -487,55 +591,140 @@ export const batchUpdateCart = async (req, res) => {
 			});
 		}
 
-		const cart = await Cart.findOne({ userEmail: email });
+		let cart = await Cart.findOne({ userEmail: email });
 
 		if (!cart) {
-			return res.status(404).json({
-				success: false,
-				message: "Cart/Item not found",
-				error: "Cart not found",
+			cart = new Cart({
+				userEmail: email,
+				userId: req.decoded.id,
+				items: [],
+				deliveryCharge: 0,
 			});
 		}
 
-		let operationsProcessed = 0;
+		// Create a deep copy of cart for atomic processing
+		const originalCartItems = JSON.parse(JSON.stringify(cart.items));
 
-		// Process each operation
-		for (const operation of operations) {
-			const { itemId, type, quantity } = operation;
-
-			if (!itemId || !type) {
-				continue; // Skip invalid operations
+		// Validate ALL operations before processing any (fail fast)
+		const allValidationErrors = [];
+		operations.forEach((operation, index) => {
+			const errors = validateOperation(operation, cart);
+			if (errors.length > 0) {
+				allValidationErrors.push(
+					`Operation ${index + 1}: ${errors.join(", ")}`
+				);
 			}
+		});
 
-			const itemIndex = cart.items.findIndex(
-				(item) => item.productId === itemId
-			);
-
-			if (itemIndex === -1) {
-				continue; // Skip if item not found
-			}
-
-			if (type === "update" && quantity && quantity > 0) {
-				// Verify minimum order quantity
-				const item = cart.items[itemIndex];
-				if (quantity >= item.minimumOrderQuantity) {
-					cart.items[itemIndex].quantity = quantity;
-					operationsProcessed++;
-				}
-			} else if (type === "remove") {
-				cart.items.splice(itemIndex, 1);
-				operationsProcessed++;
-			}
+		if (allValidationErrors.length > 0) {
+			return res.status(400).json({
+				success: false,
+				message: "Batch operation validation failed",
+				error: allValidationErrors.join("; "),
+			});
 		}
 
-		await cart.save();
+		// Process operations sequentially to maintain data integrity
+		let processedCount = 0;
+		const operationResults = [];
 
-		res.status(200).json({
-			success: true,
-			message: "Cart updated successfully",
-			cart: formatCartResponse(cart),
-			operationsProcessed,
-		});
+		try {
+			for (let i = 0; i < operations.length; i++) {
+				const operation = operations[i];
+				const { type, productId, quantity, item } = operation;
+
+				if (type === "update") {
+					const itemIndex = cart.items.findIndex(
+						(cartItem) => cartItem.productId === productId
+					);
+					if (itemIndex !== -1) {
+						const oldQuantity = cart.items[itemIndex].quantity;
+						cart.items[itemIndex].quantity = quantity;
+						operationResults.push(
+							`Updated ${cart.items[itemIndex].title}: ${oldQuantity} → ${quantity}`
+						);
+						processedCount++;
+					}
+				} else if (type === "remove") {
+					const itemIndex = cart.items.findIndex(
+						(cartItem) => cartItem.productId === productId
+					);
+					if (itemIndex !== -1) {
+						const removedItem = cart.items[itemIndex];
+						cart.items.splice(itemIndex, 1);
+						operationResults.push(`Removed ${removedItem.title}`);
+						processedCount++;
+					}
+				} else if (type === "add") {
+					const {
+						_id,
+						title,
+						price,
+						quantity: itemQuantity,
+						unit,
+						image,
+						category,
+						seller,
+						minimumOrderQuantity = 1,
+					} = item;
+
+					// Check if item already exists (merge logic)
+					const existingItemIndex = cart.items.findIndex(
+						(cartItem) => cartItem.productId === _id
+					);
+
+					if (existingItemIndex !== -1) {
+						// Merge: Add quantities together
+						const oldQuantity = cart.items[existingItemIndex].quantity;
+						cart.items[existingItemIndex].quantity += itemQuantity;
+						operationResults.push(
+							`Merged ${title}: ${oldQuantity} + ${itemQuantity} = ${cart.items[existingItemIndex].quantity}`
+						);
+					} else {
+						// Add new item to cart
+						const newItem = {
+							productId: _id,
+							title: title,
+							price: price,
+							unit: unit,
+							quantity: itemQuantity,
+							minimumOrderQuantity: minimumOrderQuantity,
+							image: image || "",
+							seller: {
+								sellerId: seller?.sellerId || "",
+								name: seller?.name || "",
+							},
+							category: category || "",
+							addedAt: new Date(),
+						};
+						cart.items.push(newItem);
+						operationResults.push(`Added ${title} (qty: ${itemQuantity})`);
+					}
+					processedCount++;
+				}
+			}
+
+			// All operations successful - save to database
+			await cart.save();
+
+			res.status(200).json({
+				success: true,
+				message: `Batch update completed successfully (${processedCount} operations processed)`,
+				cart: formatCartResponse(cart),
+				operationResults: operationResults,
+			});
+		} catch (operationError) {
+			// Rollback: restore original cart items
+			cart.items = originalCartItems;
+
+			res.status(500).json({
+				success: false,
+				message: "Batch operation failed - all changes rolled back",
+				error: `Operation failed at step ${processedCount + 1}: ${
+					operationError.message
+				}`,
+			});
+		}
 	} catch (error) {
 		res.status(500).json({
 			success: false,
@@ -573,19 +762,34 @@ export const previewCartMerge = async (req, res) => {
 
 		let mergedItems = 0;
 		let totalQuantityIncrease = 0;
+		const mergeDetails = [];
 
-		// Calculate merge preview
+		// Calculate merge preview with detailed information
 		if (cart) {
 			for (const newItem of newItems) {
 				const existingItem = cart.items.find(
-					(item) => item.productId === newItem.productId
+					(item) => item.productId === newItem._id
 				);
 
 				if (existingItem) {
 					mergedItems++;
 					totalQuantityIncrease += newItem.quantity;
+					mergeDetails.push({
+						productId: newItem._id,
+						title: newItem.title,
+						action: "merge",
+						currentQuantity: existingItem.quantity,
+						addingQuantity: newItem.quantity,
+						finalQuantity: existingItem.quantity + newItem.quantity,
+					});
 				} else {
 					totalQuantityIncrease += newItem.quantity;
+					mergeDetails.push({
+						productId: newItem._id,
+						title: newItem.title,
+						action: "add",
+						quantity: newItem.quantity,
+					});
 				}
 			}
 		} else {
@@ -593,6 +797,14 @@ export const previewCartMerge = async (req, res) => {
 				(total, item) => total + item.quantity,
 				0
 			);
+			newItems.forEach((item) => {
+				mergeDetails.push({
+					productId: item._id,
+					title: item.title,
+					action: "add",
+					quantity: item.quantity,
+				});
+			});
 		}
 
 		const finalItems = currentItems + newItems.length - mergedItems;
@@ -605,6 +817,7 @@ export const previewCartMerge = async (req, res) => {
 				finalItems,
 				mergedItems,
 				totalQuantityIncrease,
+				mergeDetails,
 			},
 		});
 	} catch (error) {
