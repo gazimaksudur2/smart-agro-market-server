@@ -1,43 +1,39 @@
 import express from "express";
 import {
 	createOrder,
-	getMyOrders,
+	getUserOrders,
+	getOrderById,
 	updateOrderStatus,
-	returnOrder,
-	completeOrder,
-	cancelOrder,
+	getSellerOrders,
+	getAdminOrders,
 } from "../controllers/orderController.js";
 import { verifyJWT, verifyRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// All order routes are protected
-// POST /orders – place order (consumer)
-router.post("/", verifyJWT, verifyRole(["consumer"]), createOrder);
+// 📦 CREATE ORDER
+// POST /api/orders
+router.post("/", verifyJWT, createOrder);
 
-// GET /orders/my-orders – get my orders (based on role)
-router.get("/my-orders", verifyJWT, getMyOrders);
+// 📋 GET USER ORDERS
+// GET /api/orders/user/:userId
+router.get("/user/:userId", verifyJWT, getUserOrders);
 
-// PATCH /orders/status/:id – update delivery stage (role-based)
-router.patch("/status/:id", verifyJWT, updateOrderStatus);
+// 📄 GET SPECIFIC ORDER
+// GET /api/orders/:orderId
+router.get("/:orderId", verifyJWT, getOrderById);
 
-// PATCH /orders/return/:id – auto/manual return logic
-router.patch(
-	"/return/:id",
-	verifyJWT,
-	verifyRole(["agent", "admin"]),
-	returnOrder
-);
+// 🔄 UPDATE ORDER STATUS
+// PUT /api/orders/:orderId/status
+router.put("/:orderId/status", verifyJWT, updateOrderStatus);
 
-// PATCH /orders/complete/:id – mark as delivered
-router.patch(
-	"/complete/:id",
-	verifyJWT,
-	verifyRole(["consumer"]),
-	completeOrder
-);
+// 📊 SELLER ORDERS
+// GET /api/orders/seller/:sellerId
+router.get("/seller/:sellerId", verifyJWT, getSellerOrders);
 
-// DELETE /orders/:id – cancel order (before shipment)
-router.delete("/:id", verifyJWT, cancelOrder);
+// 🛡️ ADMIN ORDERS
+// GET /api/admin/orders (this will be handled in admin routes)
+// But we can also provide it here for convenience
+router.get("/admin/all", verifyJWT, verifyRole(["admin"]), getAdminOrders);
 
 export default router;

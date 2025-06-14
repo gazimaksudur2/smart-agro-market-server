@@ -54,7 +54,7 @@ app.use("/users", authRoutes);
 app.use("/admin", adminRoutes);
 app.use("/agents", agentRoutes);
 app.use("/products", productRoutes);
-app.use("/orders", orderRoutes);
+app.use("/api/orders", orderRoutes);
 app.use("/reviews", reviewRoutes);
 app.use("/regions", regionRoutes);
 app.use("/api/cart", cartRoutes);

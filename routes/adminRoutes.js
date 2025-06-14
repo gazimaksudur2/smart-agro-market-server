@@ -27,6 +27,7 @@ import {
 	editProduct,
 	getProductHistory,
 } from "../controllers/adminControllers.js";
+import { getAdminOrders } from "../controllers/orderController.js";
 
 const router = express.Router();
 
@@ -99,5 +100,8 @@ router.post(
 
 // Agent Management
 router.get("/agents", verifyJWT, adminOnly, getAllAgents);
+
+// Order Management
+router.get("/orders", verifyJWT, adminOnly, getAdminOrders);
 
 export default router;
