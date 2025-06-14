@@ -303,6 +303,7 @@ export const approveApplication = async (req, res) => {
 				region: application.operationalArea.region,
 				district: application.operationalArea.district,
 			};
+			userToUpdate.verified = true;
 		} else if (application.applicationType === "agent-application") {
 			// Generate unique agent ID
 			const agentCount = await Agent.countDocuments();

@@ -57,7 +57,7 @@ app.use("/products", productRoutes);
 app.use("/orders", orderRoutes);
 app.use("/reviews", reviewRoutes);
 app.use("/regions", regionRoutes);
-app.use("/carts", cartRoutes);
+app.use("/api/cart", cartRoutes);
 app.use("/", paymentRoutes); // Payment routes are at root level for /create-payment-intent
 app.use("/applications", applicationRoutes);
 
