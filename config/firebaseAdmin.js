@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Initialize Firebase Admin with service account if available
+// Initialize Firebase Admin with service account if available for admin privileges
 const initializeFirebaseAdmin = () => {
 	try {
 		if (admin.apps.length === 0) {
